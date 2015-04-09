@@ -265,7 +265,32 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 
 		d.SetPartial("service_offering")
 	}
-	//TODO: update fn for if keypair changes
+
+	if d.HasChange("keypair") {
+		log.Printf("[DEBUG] SSH keypair changed for %s, starting update", name)
+
+		p := cs.SSH.NewResetSSHKeyForVirtualMachineParams(d.Id(), d.Get("keypair").(string))
+		// Before we can actually change the service offering, the virtual machine must be stopped
+		_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()))
+		if err != nil {
+			return fmt.Errorf(
+				"Error stopping instance %s before changing SSH keypair: %s", name, err)
+		}
+		// Change the service offering
+		_, err = cs.SSH.ResetSSHKeyForVirtualMachine(p)
+		if err != nil {
+			return fmt.Errorf(
+				"Error changing the SSH keypair for instance %s: %s", name, err)
+		}
+		// Start the virtual machine again
+		_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()))
+		if err != nil {
+			return fmt.Errorf(
+				"Error starting instance %s after changing SSH keypair: %s", name, err)
+		}
+
+		d.SetPartial("keypair")
+	}
 
 	d.Partial(false)
 	return resourceCloudStackInstanceRead(d, meta)
