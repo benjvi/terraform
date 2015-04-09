@@ -184,7 +184,8 @@ func resourceCloudStackDiskUpdate(d *schema.ResourceData, meta interface{}) erro
 		}
 
 		// Create a new parameter struct
-		p := cs.Volume.NewResizeVolumeParams(d.Id())
+		p := cs.Volume.NewResizeVolumeParams()
+		p.SetId(d.Id())
 
 		// Retrieve the disk_offering UUID
 		diskofferingid, e := retrieveUUID(cs, "disk_offering", d.Get("disk_offering").(string))
