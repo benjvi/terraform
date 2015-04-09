@@ -62,6 +62,19 @@ func resourceCloudStackInstance() *schema.Resource {
 				ForceNew: true,
 			},
 
+			"keypair": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: false,
+			},
+
+			//TODO: password can also be reset
+			"password": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+
 			"user_data": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -136,6 +149,10 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		p.SetIpaddress(ipaddres.(string))
 	}
 
+	if keypair, ok := d.GetOk("keypair"); ok {
+		p.SetKeypair(keypair.(string))
+	}
+
 	// If the user data contains any info, it needs to be base64 encoded and
 	// added to the parameter struct
 	if userData, ok := d.GetOk("user_data"); ok {
@@ -155,7 +172,8 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	}
 
 	d.SetId(r.Id)
-
+	//password is only ever returned after vm creation
+	d.Set("password", r.Password)
 	return resourceCloudStackInstanceRead(d, meta)
 }
 
@@ -183,7 +201,7 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	d.Set("ipaddress", vm.Nic[0].Ipaddress)
 	d.Set("template", vm.Templatename)
 	d.Set("zone", vm.Zonename)
-
+	d.Set("keypair", vm.Keypair)
 	return nil
 }
 
@@ -247,6 +265,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 
 		d.SetPartial("service_offering")
 	}
+	//TODO: update fn for if keypair changes
 
 	d.Partial(false)
 	return resourceCloudStackInstanceRead(d, meta)
