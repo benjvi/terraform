@@ -38,16 +38,22 @@ func resourceCloudStackInstance() *schema.Resource {
 			},
 
 			"network": &schema.Schema{
-				Type:     schema.TypeString,
+				Type:     schema.TypeList,
 				Optional: true,
 				ForceNew: true,
+				Elem: &schema.Schema{Type: schema.TypeString},
 			},
 
 			"ipaddress": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
 				Computed: true,
-				ForceNew: true,
+			},
+
+			"iptoNetworkList": &schema.Schema{
+				Type:	  schema.TypeMap,
+				Optional: true,
+				Computed: true,
 			},
 
 			"template": &schema.Schema{
@@ -127,13 +133,18 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	}
 
 	if zone.Networktype == "Advanced" {
-		// Retrieve the network UUID
-		networkid, e := retrieveUUID(cs, "network", d.Get("network").(string))
-		if e != nil {
-			return e.Error()
+		networkSlice := []string{}
+//		ipToNetwork := map[string]string
+		for _, network := range d.Get("network").([]interface{}) {
+			// Retrieve the network UUID
+			networkid, e := retrieveUUID(cs, "network", network.(string))
+			if e != nil {
+				return e.Error()
+			}
+			//set the default network ID
+			networkSlice = append(networkSlice, networkid)
 		}
-		// Set the default network ID
-		p.SetNetworkids([]string{networkid})
+		p.SetNetworkids(networkSlice)
 	}
 
 	// If there is a ipaddres supplied, add it to the parameter struct
@@ -197,7 +208,10 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	d.Set("zone", vm.Zonename)
 	//NB cloudstack sometimes sends back the wrong keypair name, so dont update it
 
-	setValueOrUUID(d, "network", vm.Nic[0].Networkname, vm.Nic[0].Networkid)
+        networks := []string{}
+        for _, nic := range vm.Nic {
+		networks = append(networks,nic.Networkname)
+	}
 	setValueOrUUID(d, "service_offering", vm.Serviceofferingname, vm.Serviceofferingid)
 	setValueOrUUID(d, "template", vm.Templatename, vm.Templateid)
 
