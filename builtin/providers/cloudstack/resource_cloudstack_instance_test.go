@@ -87,26 +87,6 @@ func TestAccCloudStackInstance_fixedIP(t *testing.T) {
 	})
 }
 
-func TestAccCloudStackInstance_updateSSHKey(t *testing.T) {
-        var sshkey cloudstack.SSHKeyPair
-
-        resource.Test(t, resource.TestCase{
-                PreCheck:     func() { testAccPreCheck(t) },
-                Providers:    testAccProviders,
-                CheckDestroy: testAccCheckCloudStackSSHKeyDestroy,
-                Steps: []resource.TestStep{
-                        resource.TestStep{
-                                Config: testAccCloudStackSSHKey_create,
-                                Check: resource.ComposeTestCheckFunc(
-                                        testAccCheckCloudStackSSHKeyExists(
-                                                "cloudstack_ssh_key.foo", &sshkey),
-                                        testAccCheckCloudStackSSHKeyCreateAttributes(&sshkey),
-                                ),
-                        },
-                },
-        })
-}
-
 func testAccCheckCloudStackInstanceExists(
 	n string, instance *cloudstack.VirtualMachine) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
@@ -221,13 +201,15 @@ resource "cloudstack_instance" "foobar" {
   network = "%s"
   template = "%s"
   zone = "%s"
+  keypair = "%s"
   user_data = "foobar\nfoo\nbar"
   expunge = true
 }`,
 	CLOUDSTACK_SERVICE_OFFERING_1,
 	CLOUDSTACK_NETWORK_1,
 	CLOUDSTACK_TEMPLATE,
-	CLOUDSTACK_ZONE)
+	CLOUDSTACK_ZONE,
+	CLOUDSTACK_KEYPAIR)
 
 var testAccCloudStackInstance_renameAndResize = fmt.Sprintf(`
 resource "cloudstack_instance" "foobar" {
@@ -237,13 +219,15 @@ resource "cloudstack_instance" "foobar" {
   network = "%s"
   template = "%s"
   zone = "%s"
+  keypair = "%s"
   user_data = "foobar\nfoo\nbar"
   expunge = true
 }`,
 	CLOUDSTACK_SERVICE_OFFERING_2,
 	CLOUDSTACK_NETWORK_1,
 	CLOUDSTACK_TEMPLATE,
-	CLOUDSTACK_ZONE)
+	CLOUDSTACK_ZONE,
+	CLOUDSTACK_KEYPAIR)
 
 var testAccCloudStackInstance_fixedIP = fmt.Sprintf(`
 resource "cloudstack_instance" "foobar" {
