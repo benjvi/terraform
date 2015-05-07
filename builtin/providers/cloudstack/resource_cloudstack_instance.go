@@ -85,6 +85,11 @@ func resourceCloudStackInstance() *schema.Resource {
 				ForceNew: true,
 			},
 
+			"keypair": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+			},
+
 			"user_data": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -175,6 +180,10 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		p.SetIpaddress(ipaddres.(string))
 	}
 
+	if keypair, ok := d.GetOk("keypair"); ok {
+		p.SetKeypair(keypair.(string))
+	}
+
 	// If the user data contains any info, it needs to be base64 encoded and
 	// added to the parameter struct
 	if userData, ok := d.GetOk("user_data"); ok {
@@ -225,6 +234,7 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	d.Set("display_name", vm.Displayname)
 	d.Set("ipaddress", vm.Nic[0].Ipaddress)
 	d.Set("zone", vm.Zonename)
+	d.Set("keypair", vm.Keypair)
 
         networks := make([]interface{},0,8)  //max of 8 nics in cloudstack
         for _, nic := range vm.Nic {
@@ -350,6 +360,32 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
                                 cs.VirtualMachine.AddNicToVirtualMachine(p)
                         }
 		}
+	}
+
+	if d.HasChange("keypair") {
+		log.Printf("[DEBUG] SSH keypair changed for %s, starting update", name)
+
+		p := cs.SSH.NewResetSSHKeyForVirtualMachineParams(d.Id(), d.Get("keypair").(string))
+		// Before we can actually change the service offering, the virtual machine must be stopped
+		_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()))
+		if err != nil {
+			return fmt.Errorf(
+				"Error stopping instance %s before changing SSH keypair: %s", name, err)
+		}
+		// Change the service offering
+		_, err = cs.SSH.ResetSSHKeyForVirtualMachine(p)
+		if err != nil {
+			return fmt.Errorf(
+				"Error changing the SSH keypair for instance %s: %s", name, err)
+		}
+		// Start the virtual machine again
+		_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()))
+		if err != nil {
+			return fmt.Errorf(
+				"Error starting instance %s after changing SSH keypair: %s", name, err)
+		}
+
+		d.SetPartial("keypair")
 	}
 
 	d.Partial(false)
