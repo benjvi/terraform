@@ -45,6 +45,7 @@ func resourceCloudStackSSHKeyPairCreate(d *schema.ResourceData, meta interface{}
 	cs := meta.(*cloudstack.CloudStackClient)
 
 	name := d.Get("name").(string)
+
 	publicKey := d.Get("public_key").(string)
 
 	if publicKey != "" {
@@ -78,10 +79,8 @@ func resourceCloudStackSSHKeyPairRead(d *schema.ResourceData, meta interface{}) 
 	cs := meta.(*cloudstack.CloudStackClient)
 
 	log.Printf("[DEBUG] looking for ssh key  %s with name %s", d.Id(), d.Get("name").(string))
-
 	p := cs.SSH.NewListSSHKeyPairsParams()
 	p.SetName(d.Get("name").(string))
-
 	r, err := cs.SSH.ListSSHKeyPairs(p)
 	if err != nil {
 		return err
@@ -91,7 +90,6 @@ func resourceCloudStackSSHKeyPairRead(d *schema.ResourceData, meta interface{}) 
 		d.Set("name", "")
 		return nil
 	}
-
 	//SSHKeyPair name is unique in a cloudstack account so dont need to check for multiple
 	d.Set("name", r.SSHKeyPairs[0].Name)
 	d.Set("fingerprint", r.SSHKeyPairs[0].Fingerprint)
