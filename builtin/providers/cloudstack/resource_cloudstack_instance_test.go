@@ -87,6 +87,26 @@ func TestAccCloudStackInstance_fixedIP(t *testing.T) {
 	})
 }
 
+func TestAccCloudStackInstance_updateSSHKey(t *testing.T) {
+        var sshkey cloudstack.SSHKeyPair
+
+        resource.Test(t, resource.TestCase{
+                PreCheck:     func() { testAccPreCheck(t) },
+                Providers:    testAccProviders,
+                CheckDestroy: testAccCheckCloudStackSSHKeyDestroy,
+                Steps: []resource.TestStep{
+                        resource.TestStep{
+                                Config: testAccCloudStackSSHKey_create,
+                                Check: resource.ComposeTestCheckFunc(
+                                        testAccCheckCloudStackSSHKeyExists(
+                                                "cloudstack_ssh_key.foo", &sshkey),
+                                        testAccCheckCloudStackSSHKeyCreateAttributes(&sshkey),
+                                ),
+                        },
+                },
+        })
+}
+
 func testAccCheckCloudStackInstanceExists(
 	n string, instance *cloudstack.VirtualMachine) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
@@ -185,6 +205,14 @@ func testAccCheckCloudStackInstanceDestroy(s *terraform.State) error {
 	return nil
 }
 
+/*func testAccCheckCloudStackInstanceAndSSHKeyDestroy(s *terraform.State) error {
+        cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	err := testAccCheckCloudStackInstanceDestroy(s)
+	if err != nil {
+		return err
+	}
+	p := csv.SSH
+}*/
 var testAccCloudStackInstance_basic = fmt.Sprintf(`
 resource "cloudstack_instance" "foobar" {
   name = "terraform-test"
