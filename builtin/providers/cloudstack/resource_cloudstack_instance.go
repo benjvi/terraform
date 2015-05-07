@@ -47,7 +47,29 @@ func resourceCloudStackInstance() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 				Computed: true,
-				ForceNew: true,
+			},
+
+			"ip_to_network_list": &schema.Schema{
+				Type:	  schema.TypeList,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"network": &schema.Schema{
+							Type:     schema.TypeString,
+							Required: true,
+						},
+
+						"ipaddress": &schema.Schema{
+							Type:     schema.TypeString,
+							Required: true,
+						},
+
+						"id": &schema.Schema{
+							Type:	  schema.TypeString,
+							Computed: true,
+						},
+					},
+				},
 			},
 
 			"template": &schema.Schema{
@@ -122,13 +144,29 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	}
 
 	if zone.Networktype == "Advanced" {
-		// Retrieve the network UUID
-		networkid, e := retrieveUUID(cs, "network", d.Get("network").(string))
-		if e != nil {
-			return e.Error()
+		networkSlice := []string{}
+		ipToNetwork := make(map[string]string)
+		if ipToNetworkList, ok := d.GetOk("ip_to_network_list"); ok {
+			for _, listItem := range ipToNetworkList.([]interface{}) {
+				networkid, e := retrieveUUID(cs, "network", listItem.(map[string]interface{})["network"].(string))
+				if e != nil {
+                                        return e.Error()
+                                }
+				ipToNetwork[listItem.(map[string]interface{})["ipaddress"].(string)] = networkid
+			}
+			p.SetIptonetworklist(ipToNetwork)
+		} else {
+			for _, network := range d.Get("network").([]interface{}) {
+				// Retrieve the network UUID
+				networkid, e := retrieveUUID(cs, "network", network.(string))
+				if e != nil {
+					return e.Error()
+				}
+				//set the default network ID
+				networkSlice = append(networkSlice, networkid)
+			}
+			p.SetNetworkids(networkSlice)
 		}
-		// Set the default network ID
-		p.SetNetworkids([]string{networkid})
 	}
 
 	// If there is a ipaddres supplied, add it to the parameter struct
@@ -187,7 +225,16 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	d.Set("ipaddress", vm.Nic[0].Ipaddress)
 	d.Set("zone", vm.Zonename)
 
-	setValueOrUUID(d, "network", vm.Nic[0].Networkname, vm.Nic[0].Networkid)
+        networks := make([]interface{},0,8)  //max of 8 nics in cloudstack
+        for _, nic := range vm.Nic {
+		network := make(map[string]string)
+		network["network"]=nic.Networkname
+		network["ipaddress"]=nic.Ipaddress
+		network["id"]=nic.Id
+		networks = append(networks,network)
+	}
+	d.Set("ip_to_network_list", networks)
+
 	setValueOrUUID(d, "service_offering", vm.Serviceofferingname, vm.Serviceofferingid)
 	setValueOrUUID(d, "template", vm.Templatename, vm.Templateid)
 
@@ -253,6 +300,56 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 		}
 
 		d.SetPartial("service_offering")
+	}
+
+	if d.HasChange("ip_to_network_list") {
+		oldNics, newNics := d.GetChange("ip_to_network_list")
+		//go through the old nics, removing any that are different in the new state
+		//todo: what to do with the default (first) nic??
+		for idx, _ := range oldNics.([]interface{}) {
+			oldNic := oldNics.([]interface{})[idx]
+                        oldIp := oldNic.(map[string]interface{})["ipaddress"].(string)
+                        oldNetwork := oldNic.(map[string]interface{})["network"].(string)
+			oldId := oldNic.(map[string]interface{})["id"].(string)
+			p := cs.VirtualMachine.NewRemoveNicFromVirtualMachineParams(oldId, d.Id())
+			if len(newNics.([]interface{}))>idx {
+				newNic := newNics.([]interface{})[idx]
+				newIp := newNic.(map[string]interface{})["ipaddress"].(string)
+				newNetwork := newNic.(map[string]interface{})["network"].(string)
+				if (newIp!= oldIp || newNetwork!=oldNetwork) {
+					cs.VirtualMachine.RemoveNicFromVirtualMachine(p)
+				}
+			} else {
+				//nic has been removed from the new config
+				cs.VirtualMachine.RemoveNicFromVirtualMachine(p)
+			}
+		}
+		for idx, _ := range newNics.([]interface{}) {
+			newNic := newNics.([]interface{})[idx]
+                        newIp := newNic.(map[string]interface{})["ipaddress"].(string)
+                        newNetwork := newNic.(map[string]interface{})["network"].(string)
+			networkid, e := retrieveUUID(cs, "network", newNetwork)
+                        if e != nil {
+                                return e.Error()
+                        }
+			p := cs.VirtualMachine.NewAddNicToVirtualMachineParams(networkid, d.Id())
+			p.SetIpaddress(newIp)
+
+                        if len(oldNics.([]interface{}))>idx {
+                                oldNic := oldNics.([]interface{})[idx]
+                                oldIp := oldNic.(map[string]interface{})["ipaddress"].(string)
+                                oldNetwork := oldNic.(map[string]interface{})["network"].(string)
+                                if (newIp!= oldIp || newNetwork!=oldNetwork) {
+                                        _, err := cs.VirtualMachine.AddNicToVirtualMachine(p)
+					if err != nil {
+						return fmt.Errorf("Error recreating the changed NIC: %s", err)
+					}
+                                }
+                        } else {
+                                //additional nic is present in the new config
+                                cs.VirtualMachine.AddNicToVirtualMachine(p)
+                        }
+		}
 	}
 
 	d.Partial(false)
