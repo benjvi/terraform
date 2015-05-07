@@ -62,6 +62,14 @@ func resourceCloudStackInstance() *schema.Resource {
 				ForceNew: true,
 			},
 
+			//TODO: password can also be reset
+			//TODO: record only hash of entered pw
+			"password": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+
 			"user_data": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -155,6 +163,10 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	}
 
 	d.SetId(r.Id)
+
+	//password is only ever returned after vm creation
+	//TODO: should hash it before we store it and only print it out once
+	d.Set("password", r.Password)
 
 	// Set the connection info for any configured provisioners
 	d.SetConnInfo(map[string]string{
