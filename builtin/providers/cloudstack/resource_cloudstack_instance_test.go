@@ -312,7 +312,7 @@ resource "cloudstack_instance" "foobar" {
   name = "terraform-test"
   display_name = "terraform"
   service_offering= "%s"
-  network = "%s"
+  network = ["%s"]
   template = "%s"
   zone = "%s"
   user_data = "foobar\nfoo\nbar"
@@ -328,7 +328,7 @@ resource "cloudstack_instance" "foobar" {
   name = "terraform-test"
   display_name = "terraform-updated"
   service_offering= "%s"
-  network = "%s"
+  network = ["%s"]
   template = "%s"
   zone = "%s"
   user_data = "foobar\nfoo\nbar"
@@ -344,7 +344,7 @@ resource "cloudstack_instance" "foobar" {
   name = "terraform-test"
   display_name = "terraform"
   service_offering= "%s"
-  network = "%s"
+  network = ["%s"]
   ipaddress = "%s"
   template = "%s"
   zone = "%s"
