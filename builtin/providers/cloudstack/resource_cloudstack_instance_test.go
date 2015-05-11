@@ -63,11 +63,11 @@ func TestAccCloudStackInstance_update(t *testing.T) {
 			},
 
 			resource.TestStep{
-				Config: testAccCloudStackInstance_renameAndResize,
+				Config: testAccCloudStackInstance_renameResizeAndAddNetwork,
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudStackInstanceExists(
 						"cloudstack_instance.foobar", &instance),
-					testAccCheckCloudStackInstanceRenamedAndResized(&instance),
+					testAccCheckCloudStackInstanceRenamedResizedAndNetworkAdded(&instance),
 					resource.TestCheckResourceAttr(
 						"cloudstack_instance.foobar", "display_name", "terraform-updated"),
 					resource.TestCheckResourceAttr(
@@ -156,7 +156,7 @@ func testAccCheckCloudStackInstanceAttributes(
 	}
 }
 
-func testAccCheckCloudStackInstanceRenamedAndResized(
+func testAccCheckCloudStackInstanceRenamedResizedAndNetworkAdded(
 	instance *cloudstack.VirtualMachine) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
@@ -167,6 +167,10 @@ func testAccCheckCloudStackInstanceRenamedAndResized(
 		if instance.Serviceofferingname != CLOUDSTACK_SERVICE_OFFERING_2 {
 			return fmt.Errorf("Bad service offering: %s", instance.Serviceofferingname)
 		}
+
+		if instance.Nic[1].Networkname != CLOUDSTACK_NETWORK_2 {
+                        return fmt.Errorf("Bad network: %s", instance.Nic[1].Networkname)
+                }
 
 		return nil
 	}
@@ -215,12 +219,12 @@ resource "cloudstack_instance" "foobar" {
 	CLOUDSTACK_ZONE,
 	CLOUDSTACK_SSH_KEYPAIR)
 
-var testAccCloudStackInstance_renameAndResize = fmt.Sprintf(`
+var testAccCloudStackInstance_renameResizeAndAddNetwork = fmt.Sprintf(`
 resource "cloudstack_instance" "foobar" {
   name = "terraform-test"
   display_name = "terraform-updated"
   service_offering= "%s"
-  network = ["%s"]
+  network = ["%s", "%s"]
   template = "%s"
   zone = "%s"
   keypair = "%s"
@@ -229,6 +233,7 @@ resource "cloudstack_instance" "foobar" {
 }`,
 	CLOUDSTACK_SERVICE_OFFERING_2,
 	CLOUDSTACK_NETWORK_1,
+	CLOUDSTACK_NETWORK_2,
 	CLOUDSTACK_TEMPLATE,
 	CLOUDSTACK_ZONE,
 	CLOUDSTACK_SSH_KEYPAIR)
