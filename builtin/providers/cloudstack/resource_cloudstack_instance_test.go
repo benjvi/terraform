@@ -66,6 +66,41 @@ func TestAccCloudStackInstance_update(t *testing.T) {
 	})
 }
 
+func TestAccCloudStackInstance_downsize(t *testing.T) {
+        var instance cloudstack.VirtualMachine
+
+        resource.Test(t, resource.TestCase{
+                PreCheck:     func() { testAccPreCheck(t) },
+                Providers:    testAccProviders,
+                CheckDestroy: testAccCheckCloudStackInstanceDestroy,
+                Steps: []resource.TestStep{
+
+                        resource.TestStep{
+                                Config: testAccCloudStackInstance_renameResizeAndAddNetwork,
+                                Check: resource.ComposeTestCheckFunc(
+                                        testAccCheckCloudStackInstanceExists(
+                                                "cloudstack_instance.foobar", &instance),
+                                        testAccCheckCloudStackInstanceRenamedResizedAndNetworkAdded(&instance),
+                                        resource.TestCheckResourceAttr(
+                                                "cloudstack_instance.foobar", "display_name", "terraform-updated"),
+                                        resource.TestCheckResourceAttr(
+                                                "cloudstack_instance.foobar", "service_offering", CLOUDSTACK_SERVICE_OFFERING_2),
+                                ),
+                        },
+
+                        resource.TestStep{
+                                Config: testAccCloudStackInstance_basic,
+                                Check: resource.ComposeTestCheckFunc(
+                                        testAccCheckCloudStackInstanceExists(
+                                                "cloudstack_instance.foobar", &instance),
+                                        testAccCheckCloudStackInstanceAttributes(&instance),
+                                ),
+                        },
+
+                },
+        })
+}
+
 func TestAccCloudStackInstance_fixedIP(t *testing.T) {
 	var instance cloudstack.VirtualMachine
 
