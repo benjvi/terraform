@@ -50,12 +50,6 @@ func resourceCloudStackInstance() *schema.Resource {
 				Computed: true,
 			},
 
-			"iptoNetworkList": &schema.Schema{
-				Type:	  schema.TypeMap,
-				Optional: true,
-				Computed: true,
-			},
-
 			"template": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
@@ -129,7 +123,6 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 
 	if zone.Networktype == "Advanced" {
 		networkSlice := []string{}
-//		ipToNetwork := map[string]string
 		for _, network := range d.Get("network").([]interface{}) {
 			// Retrieve the network UUID
 			networkid, e := retrieveUUID(cs, "network", network.(string))
