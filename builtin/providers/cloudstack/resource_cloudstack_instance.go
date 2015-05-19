@@ -155,10 +155,11 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		return fmt.Errorf("Error creating the new instance %s: %s", name, err)
 	}
 	d.SetId(r.Id)
-	d.setPartial("Id")
+	d.SetPartial("id")
+	d.SetPartial("expunge")	
 
 	// Wait until the operation finished
-	r, err = cs.VirtualMachine.WaitForVirtualMachine(r.JobId)
+	r, err = cs.VirtualMachine.WaitForVirtualMachine(r.JobID)
 	if err != nil {
                 return fmt.Errorf("Error creating the new instance %s: %s", name, err)
         }
