@@ -93,6 +93,7 @@ func resourceCloudStackInstance() *schema.Resource {
 
 func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) error {
 	cs := meta.(*cloudstack.CloudStackClient)
+	d.Partial(true)
 
 	// Retrieve the service_offering UUID
 	serviceofferingid, e := retrieveUUID(cs, "service_offering", d.Get("service_offering").(string))
@@ -162,18 +163,25 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	}
 
 	// Create the new instance
-	r, err := cs.VirtualMachine.DeployVirtualMachine(p)
+	r, err := cs.VirtualMachine.DeployVirtualMachine(p, false)
 	if err != nil {
 		return fmt.Errorf("Error creating the new instance %s: %s", name, err)
 	}
-
 	d.SetId(r.Id)
+	d.setPartial("Id")
+
+	// Wait until the operation finished
+	r, err = cs.VirtualMachine.WaitForVirtualMachine(r.JobId)
+	if err != nil {
+                return fmt.Errorf("Error creating the new instance %s: %s", name, err)
+        }
 
 	// Set the connection info for any configured provisioners
 	d.SetConnInfo(map[string]string{
 		"host":     r.Nic[0].Ipaddress,
 		"password": r.Password,
 	})
+	d.Partial(false)
 
 	return resourceCloudStackInstanceRead(d, meta)
 }
