@@ -69,7 +69,7 @@ func resourceCloudStackIPAddressCreate(d *schema.ResourceData, meta interface{})
 	}
 
 	// Associate a new IP address
-	r, err := cs.Address.AssociateIpAddress(p)
+	r, err := cs.Address.AssociateIpAddress(p, true)
 	if err != nil {
 		return fmt.Errorf("Error associating a new IP address: %s", err)
 	}
@@ -128,7 +128,7 @@ func resourceCloudStackIPAddressDelete(d *schema.ResourceData, meta interface{})
 	p := cs.Address.NewDisassociateIpAddressParams(d.Id())
 
 	// Disassociate the IP address
-	if _, err := cs.Address.DisassociateIpAddress(p); err != nil {
+	if _, err := cs.Address.DisassociateIpAddress(p, true); err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(
 			"Invalid parameter id value=%s due to incorrect long value format, "+

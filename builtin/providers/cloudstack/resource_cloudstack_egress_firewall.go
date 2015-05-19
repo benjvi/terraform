@@ -144,7 +144,7 @@ func resourceCloudStackEgressFirewallCreateRule(
 		p.SetIcmptype(rule["icmp_type"].(int))
 		p.SetIcmpcode(rule["icmp_code"].(int))
 
-		r, err := cs.Firewall.CreateEgressFirewallRule(p)
+		r, err := cs.Firewall.CreateEgressFirewallRule(p, true)
 		if err != nil {
 			return err
 		}
@@ -183,7 +183,7 @@ func resourceCloudStackEgressFirewallCreateRule(
 				p.SetStartport(startPort)
 				p.SetEndport(endPort)
 
-				r, err := cs.Firewall.CreateEgressFirewallRule(p)
+				r, err := cs.Firewall.CreateEgressFirewallRule(p, true)
 				if err != nil {
 					return err
 				}
@@ -413,7 +413,7 @@ func resourceCloudStackEgressFirewallDeleteRule(
 		p := cs.Firewall.NewDeleteEgressFirewallRuleParams(id.(string))
 
 		// Delete the rule
-		if _, err := cs.Firewall.DeleteEgressFirewallRule(p); err != nil {
+		if _, err := cs.Firewall.DeleteEgressFirewallRule(p, true); err != nil {
 
 			// This is a very poor way to be told the UUID does no longer exist :(
 			if strings.Contains(err.Error(), fmt.Sprintf(

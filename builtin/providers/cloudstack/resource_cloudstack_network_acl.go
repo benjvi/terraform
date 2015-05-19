@@ -60,7 +60,7 @@ func resourceCloudStackNetworkACLCreate(d *schema.ResourceData, meta interface{}
 	}
 
 	// Create the new network ACL list
-	r, err := cs.NetworkACL.CreateNetworkACLList(p)
+	r, err := cs.NetworkACL.CreateNetworkACLList(p, true)
 	if err != nil {
 		return fmt.Errorf("Error creating network ACL list %s: %s", name, err)
 	}
@@ -107,7 +107,7 @@ func resourceCloudStackNetworkACLDelete(d *schema.ResourceData, meta interface{}
 	p := cs.NetworkACL.NewDeleteNetworkACLListParams(d.Id())
 
 	// Delete the network ACL list
-	_, err := cs.NetworkACL.DeleteNetworkACLList(p)
+	_, err := cs.NetworkACL.DeleteNetworkACLList(p, true)
 	if err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(

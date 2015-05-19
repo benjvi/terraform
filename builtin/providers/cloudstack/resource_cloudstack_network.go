@@ -192,7 +192,7 @@ func resourceCloudStackNetworkUpdate(d *schema.ResourceData, meta interface{}) e
 	}
 
 	// Update the network
-	_, err := cs.Network.UpdateNetwork(p)
+	_, err := cs.Network.UpdateNetwork(p, true)
 	if err != nil {
 		return fmt.Errorf(
 			"Error updating network %s: %s", name, err)
@@ -208,7 +208,7 @@ func resourceCloudStackNetworkDelete(d *schema.ResourceData, meta interface{}) e
 	p := cs.Network.NewDeleteNetworkParams(d.Id())
 
 	// Delete the network
-	_, err := cs.Network.DeleteNetwork(p)
+	_, err := cs.Network.DeleteNetwork(p, true)
 	if err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(

@@ -157,7 +157,7 @@ func resourceCloudStackNetworkACLRuleCreateRule(
 		p.SetIcmptype(rule["icmp_type"].(int))
 		p.SetIcmpcode(rule["icmp_code"].(int))
 
-		r, err := cs.NetworkACL.CreateNetworkACL(p)
+		r, err := cs.NetworkACL.CreateNetworkACL(p, true)
 		if err != nil {
 			return err
 		}
@@ -167,7 +167,7 @@ func resourceCloudStackNetworkACLRuleCreateRule(
 
 	// If the protocol is ALL set the needed parameters
 	if rule["protocol"].(string) == "all" {
-		r, err := cs.NetworkACL.CreateNetworkACL(p)
+		r, err := cs.NetworkACL.CreateNetworkACL(p, true)
 		if err != nil {
 			return err
 		}
@@ -206,7 +206,7 @@ func resourceCloudStackNetworkACLRuleCreateRule(
 				p.SetStartport(startPort)
 				p.SetEndport(endPort)
 
-				r, err := cs.NetworkACL.CreateNetworkACL(p)
+				r, err := cs.NetworkACL.CreateNetworkACL(p, true)
 				if err != nil {
 					return err
 				}
@@ -465,7 +465,7 @@ func resourceCloudStackNetworkACLRuleDeleteRule(
 		p := cs.NetworkACL.NewDeleteNetworkACLParams(id.(string))
 
 		// Delete the rule
-		if _, err := cs.NetworkACL.DeleteNetworkACL(p); err != nil {
+		if _, err := cs.NetworkACL.DeleteNetworkACL(p, true); err != nil {
 
 			// This is a very poor way to be told the UUID does no longer exist :(
 			if strings.Contains(err.Error(), fmt.Sprintf(
