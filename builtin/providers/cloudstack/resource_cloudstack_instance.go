@@ -243,7 +243,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 		p := cs.VirtualMachine.NewChangeServiceForVirtualMachineParams(d.Id(), serviceofferingid)
 
 		// Before we can actually change the service offering, the virtual machine must be stopped
-		_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()))
+		_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()), true)
 		if err != nil {
 			return fmt.Errorf(
 				"Error stopping instance %s before changing service offering: %s", name, err)
@@ -255,7 +255,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 				"Error changing the service offering for instance %s: %s", name, err)
 		}
 		// Start the virtual machine again
-		_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()))
+		_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()), true)
 		if err != nil {
 			return fmt.Errorf(
 				"Error starting instance %s after changing service offering: %s", name, err)
@@ -279,7 +279,7 @@ func resourceCloudStackInstanceDelete(d *schema.ResourceData, meta interface{}) 
 	}
 
 	log.Printf("[INFO] Destroying instance: %s", d.Get("name").(string))
-	if _, err := cs.VirtualMachine.DestroyVirtualMachine(p); err != nil {
+	if _, err := cs.VirtualMachine.DestroyVirtualMachine(p, true); err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(
 			"Invalid parameter id value=%s due to incorrect long value format, "+

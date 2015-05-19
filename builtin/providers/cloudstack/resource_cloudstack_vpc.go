@@ -76,7 +76,7 @@ func resourceCloudStackVPCCreate(d *schema.ResourceData, meta interface{}) error
 	p := cs.VPC.NewCreateVPCParams(d.Get("cidr").(string), displaytext.(string), name, vpcofferingid, zoneid)
 
 	// Create the new VPC
-	r, err := cs.VPC.CreateVPC(p)
+	r, err := cs.VPC.CreateVPC(p, true)
 	if err != nil {
 		return fmt.Errorf("Error creating VPC %s: %s", name, err)
 	}
@@ -136,7 +136,7 @@ func resourceCloudStackVPCUpdate(d *schema.ResourceData, meta interface{}) error
 		p.SetDisplaytext(displaytext.(string))
 
 		// Update the VPC
-		_, err := cs.VPC.UpdateVPC(p)
+		_, err := cs.VPC.UpdateVPC(p, true)
 		if err != nil {
 			return fmt.Errorf(
 				"Error updating VPC %s: %s", d.Get("name").(string), err)
@@ -153,7 +153,7 @@ func resourceCloudStackVPCDelete(d *schema.ResourceData, meta interface{}) error
 	p := cs.VPC.NewDeleteVPCParams(d.Id())
 
 	// Delete the VPC
-	_, err := cs.VPC.DeleteVPC(p)
+	_, err := cs.VPC.DeleteVPC(p, true)
 	if err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(

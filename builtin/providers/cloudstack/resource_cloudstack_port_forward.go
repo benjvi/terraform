@@ -132,7 +132,7 @@ func resourceCloudStackPortForwardCreateForward(
 	// Do not open the firewall automatically in any case
 	p.SetOpenfirewall(false)
 
-	r, err := cs.Firewall.CreatePortForwardingRule(p)
+	r, err := cs.Firewall.CreatePortForwardingRule(p, true)
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func resourceCloudStackPortForwardDeleteForward(
 	p := cs.Firewall.NewDeletePortForwardingRuleParams(forward["uuid"].(string))
 
 	// Delete the forward
-	if _, err := cs.Firewall.DeletePortForwardingRule(p); err != nil {
+	if _, err := cs.Firewall.DeletePortForwardingRule(p, true); err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if !strings.Contains(err.Error(), fmt.Sprintf(
 			"Invalid parameter id value=%s due to incorrect long value format, "+

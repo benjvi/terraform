@@ -62,7 +62,7 @@ func resourceCloudStackNICCreate(d *schema.ResourceData, meta interface{}) error
 	}
 
 	// Create and attach the new NIC
-	r, err := cs.VirtualMachine.AddNicToVirtualMachine(p)
+	r, err := cs.VirtualMachine.AddNicToVirtualMachine(p, true)
 	if err != nil {
 		return fmt.Errorf("Error creating the new NIC: %s", err)
 	}
@@ -131,7 +131,7 @@ func resourceCloudStackNICDelete(d *schema.ResourceData, meta interface{}) error
 	p := cs.VirtualMachine.NewRemoveNicFromVirtualMachineParams(d.Id(), virtualmachineid)
 
 	// Remove the NIC
-	_, err := cs.VirtualMachine.RemoveNicFromVirtualMachine(p)
+	_, err := cs.VirtualMachine.RemoveNicFromVirtualMachine(p, true)
 	if err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(

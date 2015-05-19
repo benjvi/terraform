@@ -96,7 +96,7 @@ func resourceCloudStackDiskCreate(d *schema.ResourceData, meta interface{}) erro
 	p.SetZoneid(zoneid)
 
 	// Create the new volume
-	r, err := cs.Volume.CreateVolume(p)
+	r, err := cs.Volume.CreateVolume(p, true)
 	if err != nil {
 		return fmt.Errorf("Error creating the new disk %s: %s", name, err)
 	}
@@ -204,7 +204,7 @@ func resourceCloudStackDiskUpdate(d *schema.ResourceData, meta interface{}) erro
 		p.SetShrinkok(d.Get("shrink_ok").(bool))
 
 		// Change the disk_offering
-		r, err := cs.Volume.ResizeVolume(p)
+		r, err := cs.Volume.ResizeVolume(p, true)
 		if err != nil {
 			return fmt.Errorf("Error changing disk offering/size for disk %s: %s", name, err)
 		}
@@ -301,7 +301,7 @@ func resourceCloudStackDiskAttach(d *schema.ResourceData, meta interface{}) erro
 	}
 
 	// Attach the new volume
-	r, err := cs.Volume.AttachVolume(p)
+	r, err := cs.Volume.AttachVolume(p, true)
 	if err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func resourceCloudStackDiskDetach(d *schema.ResourceData, meta interface{}) erro
 	p.SetId(d.Id())
 
 	// Detach the currently attached volume
-	if _, err := cs.Volume.DetachVolume(p); err != nil {
+	if _, err := cs.Volume.DetachVolume(p, true); err != nil {
 		// Retrieve the virtual_machine UUID
 		virtualmachineid, e := retrieveUUID(cs, "virtual_machine", d.Get("virtual_machine").(string))
 		if e != nil {
@@ -337,12 +337,12 @@ func resourceCloudStackDiskDetach(d *schema.ResourceData, meta interface{}) erro
 		pd := cs.VirtualMachine.NewStopVirtualMachineParams(virtualmachineid)
 
 		// Stop the virtual machine in order to be able to detach the disk
-		if _, err := cs.VirtualMachine.StopVirtualMachine(pd); err != nil {
+		if _, err := cs.VirtualMachine.StopVirtualMachine(pd, true); err != nil {
 			return err
 		}
 
 		// Try again to detach the currently attached volume
-		if _, err := cs.Volume.DetachVolume(p); err != nil {
+		if _, err := cs.Volume.DetachVolume(p, true); err != nil {
 			return err
 		}
 
@@ -350,7 +350,7 @@ func resourceCloudStackDiskDetach(d *schema.ResourceData, meta interface{}) erro
 		pu := cs.VirtualMachine.NewStartVirtualMachineParams(virtualmachineid)
 
 		// Start the virtual machine again
-		if _, err := cs.VirtualMachine.StartVirtualMachine(pu); err != nil {
+		if _, err := cs.VirtualMachine.StartVirtualMachine(pu, true); err != nil {
 			return err
 		}
 	}

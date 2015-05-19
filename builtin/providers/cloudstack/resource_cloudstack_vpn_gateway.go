@@ -43,7 +43,7 @@ func resourceCloudStackVPNGatewayCreate(d *schema.ResourceData, meta interface{}
 	p := cs.VPN.NewCreateVpnGatewayParams(vpcid)
 
 	// Create the new VPN Gateway
-	v, err := cs.VPN.CreateVpnGateway(p)
+	v, err := cs.VPN.CreateVpnGateway(p, true)
 	if err != nil {
 		return fmt.Errorf("Error creating VPN Gateway for VPC %s: %s", d.Get("vpc").(string), err)
 	}
@@ -83,7 +83,7 @@ func resourceCloudStackVPNGatewayDelete(d *schema.ResourceData, meta interface{}
 	p := cs.VPN.NewDeleteVpnGatewayParams(d.Id())
 
 	// Delete the VPN Gateway
-	_, err := cs.VPN.DeleteVpnGateway(p)
+	_, err := cs.VPN.DeleteVpnGateway(p, true)
 	if err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(

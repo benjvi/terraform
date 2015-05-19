@@ -276,7 +276,7 @@ func resourceCloudStackTemplateDelete(d *schema.ResourceData, meta interface{}) 
 
 	// Delete the template
 	log.Printf("[INFO] Deleting template: %s", d.Get("name").(string))
-	_, err := cs.Template.DeleteTemplate(p)
+	_, err := cs.Template.DeleteTemplate(p, true)
 	if err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(
