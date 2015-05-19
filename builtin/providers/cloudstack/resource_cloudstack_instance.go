@@ -70,7 +70,6 @@ func resourceCloudStackInstance() *schema.Resource {
 			"user_data": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
-				ForceNew: true,
 				StateFunc: func(v interface{}) string {
 					switch v.(type) {
 					case string:
@@ -296,6 +295,46 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 		if err != nil {
 			return fmt.Errorf(
 				"Error starting instance %s after making changes", name)
+		}
+	}
+
+	// Simple implementation - but should we combine composite changes into one action?
+	if d.HasChange("user_data") {
+		// If user data is removed, don't send update (??)
+		if userData, ok := d.GetOk("user_data"); ok {
+			ud := base64.StdEncoding.EncodeToString([]byte(userData.(string)))
+			if len(ud) > 2048 {
+				return fmt.Errorf(
+					"The supplied user_data contains %d bytes after encoding, "+
+						"this exeeds the limit of 2048 bytes", len(ud))
+			}
+
+			log.Printf("[DEBUG] User data  changed for %s, starting update", name)
+
+			// Create a new parameter struct
+		        p := cs.VirtualMachine.NewUpdateVirtualMachineParams(d.Id())
+			p.SetUserdata(ud)
+
+			// Before we can actually change the service offering, the virtual machine must be stopped
+			_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()))
+	                if err != nil {
+		                return fmt.Errorf(
+	                                "Error stopping instance %s before changing user data: %s", name, err)
+		        }
+	               // Change the service offering
+		        _, err = cs.VirtualMachine.UpdateVirtualMachine(p)
+			if err != nil {
+				return fmt.Errorf(
+					"Error changing the user data for instance %s: %s", name, err)
+	                }
+		        // Start the virtual machine again
+			_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()))
+	                if err != nil {
+		                return fmt.Errorf(
+			                "Error starting instance %s after changing user data: %s", name, err)
+	                }
+
+		        d.SetPartial("user_data")
 		}
 	}
 
