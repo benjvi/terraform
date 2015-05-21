@@ -316,7 +316,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 			p.SetUserdata(ud)
 
 			// Before we can actually change the service offering, the virtual machine must be stopped
-			_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()))
+			_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()), true)
 	                if err != nil {
 		                return fmt.Errorf(
 	                                "Error stopping instance %s before changing user data: %s", name, err)
@@ -328,7 +328,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 					"Error changing the user data for instance %s: %s", name, err)
 	                }
 		        // Start the virtual machine again
-			_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()))
+			_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()), true)
 	                if err != nil {
 		                return fmt.Errorf(
 			                "Error starting instance %s after changing user data: %s", name, err)
