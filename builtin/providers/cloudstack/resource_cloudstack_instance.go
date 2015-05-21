@@ -153,10 +153,10 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	// added to the parameter struct
 	if userData, ok := d.GetOk("user_data"); ok {
 		ud := base64.StdEncoding.EncodeToString([]byte(userData.(string)))
-		if len(ud) > 2048 {
+		if len(ud) > 32768 {
 			return fmt.Errorf(
 				"The supplied user_data contains %d bytes after encoding, "+
-					"this exeeds the limit of 2048 bytes", len(ud))
+					"this exeeds the limit of 32768 bytes", len(ud))
 		}
 		p.SetUserdata(ud)
 	}
@@ -303,10 +303,10 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 		// If user data is removed, don't send update (??)
 		if userData, ok := d.GetOk("user_data"); ok {
 			ud := base64.StdEncoding.EncodeToString([]byte(userData.(string)))
-			if len(ud) > 2048 {
+			if len(ud) > 32768 {
 				return fmt.Errorf(
 					"The supplied user_data contains %d bytes after encoding, "+
-						"this exeeds the limit of 2048 bytes", len(ud))
+						"this exeeds the limit of 32768 bytes", len(ud))
 			}
 
 			log.Printf("[DEBUG] User data  changed for %s, starting update", name)
