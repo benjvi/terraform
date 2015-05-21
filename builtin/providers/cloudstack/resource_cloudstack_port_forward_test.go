@@ -141,7 +141,7 @@ func testAccCheckCloudStackPortForwardDestroy(s *terraform.State) error {
 			}
 
 			p := cs.Firewall.NewDeletePortForwardingRuleParams(uuid)
-			_, err := cs.Firewall.DeletePortForwardingRule(p)
+			_, err := cs.Firewall.DeletePortForwardingRule(p, true)
 
 			if err != nil {
 				return err

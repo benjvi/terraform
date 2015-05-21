@@ -155,7 +155,7 @@ func testAccCheckCloudStackEgressFirewallDestroy(s *terraform.State) error {
 			}
 
 			p := cs.Firewall.NewDeleteEgressFirewallRuleParams(uuid)
-			_, err := cs.Firewall.DeleteEgressFirewallRule(p)
+			_, err := cs.Firewall.DeleteEgressFirewallRule(p, true)
 
 			if err != nil {
 				return err

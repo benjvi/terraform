@@ -164,7 +164,7 @@ func testAccCheckCloudStackVPNCustomerGatewayDestroy(s *terraform.State) error {
 		}
 
 		p := cs.VPN.NewDeleteVpnCustomerGatewayParams(rs.Primary.ID)
-		_, err := cs.VPN.DeleteVpnCustomerGateway(p)
+		_, err := cs.VPN.DeleteVpnCustomerGateway(p, true)
 
 		if err != nil {
 			return fmt.Errorf(
