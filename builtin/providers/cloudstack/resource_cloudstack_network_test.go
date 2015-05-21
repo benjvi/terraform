@@ -141,7 +141,7 @@ func testAccCheckCloudStackNetworkDestroy(s *terraform.State) error {
 		}
 
 		p := cs.Network.NewDeleteNetworkParams(rs.Primary.ID)
-		_, err := cs.Network.DeleteNetwork(p)
+		_, err := cs.Network.DeleteNetwork(p, true)
 
 		if err != nil {
 			return fmt.Errorf(

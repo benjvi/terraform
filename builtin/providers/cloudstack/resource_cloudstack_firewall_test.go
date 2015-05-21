@@ -149,7 +149,7 @@ func testAccCheckCloudStackFirewallDestroy(s *terraform.State) error {
 			}
 
 			p := cs.Firewall.NewDeleteFirewallRuleParams(uuid)
-			_, err := cs.Firewall.DeleteFirewallRule(p)
+			_, err := cs.Firewall.DeleteFirewallRule(p, true)
 
 			if err != nil {
 				return err

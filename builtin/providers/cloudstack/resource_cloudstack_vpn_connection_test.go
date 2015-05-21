@@ -72,7 +72,7 @@ func testAccCheckCloudStackVPNConnectionDestroy(s *terraform.State) error {
 		}
 
 		p := cs.VPN.NewDeleteVpnConnectionParams(rs.Primary.ID)
-		_, err := cs.VPN.DeleteVpnConnection(p)
+		_, err := cs.VPN.DeleteVpnConnection(p, true)
 
 		if err != nil {
 			return fmt.Errorf(

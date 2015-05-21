@@ -72,7 +72,7 @@ func testAccCheckCloudStackVPNGatewayDestroy(s *terraform.State) error {
 		}
 
 		p := cs.VPN.NewDeleteVpnGatewayParams(rs.Primary.ID)
-		_, err := cs.VPN.DeleteVpnGateway(p)
+		_, err := cs.VPN.DeleteVpnGateway(p, true)
 
 		if err != nil {
 			return fmt.Errorf(

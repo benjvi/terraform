@@ -150,7 +150,7 @@ func testAccCheckCloudStackTemplateDestroy(s *terraform.State) error {
 		}
 
 		p := cs.Template.NewDeleteTemplateParams(rs.Primary.ID)
-		_, err := cs.Template.DeleteTemplate(p)
+		_, err := cs.Template.DeleteTemplate(p, true)
 
 		if err != nil {
 			return fmt.Errorf(

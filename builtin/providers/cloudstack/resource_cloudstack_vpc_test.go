@@ -1,4 +1,4 @@
-package cloudstack
+
 
 import (
 	"fmt"
@@ -93,7 +93,7 @@ func testAccCheckCloudStackVPCDestroy(s *terraform.State) error {
 		}
 
 		p := cs.VPC.NewDeleteVPCParams(rs.Primary.ID)
-		_, err := cs.VPC.DeleteVPC(p)
+		_, err := cs.VPC.DeleteVPC(p, true)
 
 		if err != nil {
 			return fmt.Errorf(
