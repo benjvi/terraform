@@ -171,7 +171,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	d.SetPartial("expunge")	
 
 	// Wait until the operation finished
-	r, err = cs.VirtualMachine.WaitForVirtualMachine(r.JobID)
+	r, err = cs.VirtualMachine.WaitForDeployVirtualMachine(r.JobID)
 	if err != nil {
                 return fmt.Errorf("Error creating the new instance %s: %s", name, err)
         }
@@ -282,7 +282,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 			p := cs.SSH.NewResetSSHKeyForVirtualMachineParams(d.Id(), d.Get("keypair").(string))
 
 			// Change the ssh keypair
-			_, err = cs.SSH.ResetSSHKeyForVirtualMachine(p)
+			_, err = cs.SSH.ResetSSHKeyForVirtualMachine(p, true)
 			if err != nil {
 				return fmt.Errorf(
 					"Error changing the SSH keypair for instance %s: %s", name, err)
@@ -291,7 +291,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 		}
 
 		// Start the virtual machine again
-		_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()))
+		_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()), true)
 		if err != nil {
 			return fmt.Errorf(
 				"Error starting instance %s after making changes", name)
