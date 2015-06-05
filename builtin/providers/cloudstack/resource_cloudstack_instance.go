@@ -248,7 +248,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 	// Attributes that require reboot to update
 	if d.HasChange("service_offering") || d.HasChange("keypair") {
 		// Before we can actually make these changes, the virtual machine must be stopped
-		_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()))
+		_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()), true)
 		if err != nil {
 			return fmt.Errorf(
 				"Error stopping instance %s before making changes: %s", name, err)
