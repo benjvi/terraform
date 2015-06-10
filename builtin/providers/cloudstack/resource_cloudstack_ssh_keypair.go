@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackSSHKeyPair() *schema.Resource {
@@ -42,7 +42,7 @@ func resourceCloudStackSSHKeyPair() *schema.Resource {
 }
 
 func resourceCloudStackSSHKeyPairCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	name := d.Get("name").(string)
 
@@ -76,7 +76,7 @@ func resourceCloudStackSSHKeyPairCreate(d *schema.ResourceData, meta interface{}
 }
 
 func resourceCloudStackSSHKeyPairRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	log.Printf("[DEBUG] looking for ssh key  %s with name %s", d.Id(), d.Get("name").(string))
 	p := cs.SSH.NewListSSHKeyPairsParams()
@@ -99,7 +99,7 @@ func resourceCloudStackSSHKeyPairRead(d *schema.ResourceData, meta interface{}) 
 }
 
 func resourceCloudStackSSHKeyPairDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.SSH.NewDeleteSSHKeyPairParams(d.Get("name").(string))

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackIPAddress() *schema.Resource {
@@ -37,7 +37,7 @@ func resourceCloudStackIPAddress() *schema.Resource {
 }
 
 func resourceCloudStackIPAddressCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	if err := verifyIPAddressParams(d); err != nil {
 		return err
@@ -80,7 +80,7 @@ func resourceCloudStackIPAddressCreate(d *schema.ResourceData, meta interface{})
 }
 
 func resourceCloudStackIPAddressRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the network ACL list details
 	f, count, err := cs.Address.GetPublicIpAddressByID(d.Id())
@@ -122,7 +122,7 @@ func resourceCloudStackIPAddressRead(d *schema.ResourceData, meta interface{}) e
 }
 
 func resourceCloudStackIPAddressDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.Address.NewDisassociateIpAddressParams(d.Id())

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackTemplate() *schema.Resource {
@@ -104,7 +104,7 @@ func resourceCloudStackTemplate() *schema.Resource {
 }
 
 func resourceCloudStackTemplateCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	if err := verifyTemplateParams(d); err != nil {
 		return err
@@ -193,7 +193,7 @@ func resourceCloudStackTemplateCreate(d *schema.ResourceData, meta interface{}) 
 }
 
 func resourceCloudStackTemplateRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the template details
 	t, count, err := cs.Template.GetTemplateByID(d.Id(), "executable")
@@ -226,7 +226,7 @@ func resourceCloudStackTemplateRead(d *schema.ResourceData, meta interface{}) er
 }
 
 func resourceCloudStackTemplateUpdate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	name := d.Get("name").(string)
 
 	// Create a new parameter struct
@@ -269,7 +269,7 @@ func resourceCloudStackTemplateUpdate(d *schema.ResourceData, meta interface{}) 
 }
 
 func resourceCloudStackTemplateDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.Template.NewDeleteTemplateParams(d.Id())

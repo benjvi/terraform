@@ -6,7 +6,7 @@ import (
 	"regexp"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 type retrieveError struct {
@@ -27,7 +27,7 @@ func setValueOrUUID(d *schema.ResourceData, key string, value string, uuid strin
 	}
 }
 
-func retrieveUUID(cs *cloudstack.CloudStackClient, name, value string) (uuid string, e *retrieveError) {
+func retrieveUUID(cs *cloudstack43.CloudStackClient, name, value string) (uuid string, e *retrieveError) {
 	// If the supplied value isn't a UUID, try to retrieve the UUID ourselves
 	if isUUID(value) {
 		return value, nil
@@ -91,7 +91,7 @@ func retrieveUUID(cs *cloudstack.CloudStackClient, name, value string) (uuid str
 	return uuid, nil
 }
 
-func retrieveTemplateUUID(cs *cloudstack.CloudStackClient, zoneid, value string) (uuid string, e *retrieveError) {
+func retrieveTemplateUUID(cs *cloudstack43.CloudStackClient, zoneid, value string) (uuid string, e *retrieveError) {
 	// If the supplied value isn't a UUID, try to retrieve the UUID ourselves
 	if isUUID(value) {
 		return value, nil

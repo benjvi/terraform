@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackNIC() *schema.Resource {
@@ -39,7 +39,7 @@ func resourceCloudStackNIC() *schema.Resource {
 }
 
 func resourceCloudStackNICCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Retrieve the network UUID
 	networkid, e := retrieveUUID(cs, "network", d.Get("network").(string))
@@ -84,7 +84,7 @@ func resourceCloudStackNICCreate(d *schema.ResourceData, meta interface{}) error
 }
 
 func resourceCloudStackNICRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the virtual machine details
 	vm, count, err := cs.VirtualMachine.GetVirtualMachineByName(d.Get("virtual_machine").(string))
@@ -119,7 +119,7 @@ func resourceCloudStackNICRead(d *schema.ResourceData, meta interface{}) error {
 }
 
 func resourceCloudStackNICDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Retrieve the virtual_machine UUID
 	virtualmachineid, e := retrieveUUID(cs, "virtual_machine", d.Get("virtual_machine").(string))

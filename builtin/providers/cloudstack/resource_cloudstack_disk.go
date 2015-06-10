@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackDisk() *schema.Resource {
@@ -66,7 +66,7 @@ func resourceCloudStackDisk() *schema.Resource {
 }
 
 func resourceCloudStackDiskCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	d.Partial(true)
 
 	name := d.Get("name").(string)
@@ -125,7 +125,7 @@ func resourceCloudStackDiskCreate(d *schema.ResourceData, meta interface{}) erro
 }
 
 func resourceCloudStackDiskRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the volume details
 	v, count, err := cs.Volume.GetVolumeByID(d.Id())
@@ -172,7 +172,7 @@ func resourceCloudStackDiskRead(d *schema.ResourceData, meta interface{}) error 
 }
 
 func resourceCloudStackDiskUpdate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	d.Partial(true)
 
 	name := d.Get("name").(string)
@@ -248,7 +248,7 @@ func resourceCloudStackDiskUpdate(d *schema.ResourceData, meta interface{}) erro
 }
 
 func resourceCloudStackDiskDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Detach the volume
 	if err := resourceCloudStackDiskDetach(d, meta); err != nil {
@@ -274,7 +274,7 @@ func resourceCloudStackDiskDelete(d *schema.ResourceData, meta interface{}) erro
 }
 
 func resourceCloudStackDiskAttach(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// First check if the disk isn't already attached
 	if attached, err := isAttached(cs, d.Id()); err != nil || attached {
@@ -313,7 +313,7 @@ func resourceCloudStackDiskAttach(d *schema.ResourceData, meta interface{}) erro
 }
 
 func resourceCloudStackDiskDetach(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Check if the volume is actually attached, before detaching
 	if attached, err := isAttached(cs, d.Id()); err != nil || !attached {
@@ -359,7 +359,7 @@ func resourceCloudStackDiskDetach(d *schema.ResourceData, meta interface{}) erro
 	return nil
 }
 
-func isAttached(cs *cloudstack.CloudStackClient, id string) (bool, error) {
+func isAttached(cs *cloudstack43.CloudStackClient, id string) (bool, error) {
 	// Get the volume details
 	v, _, err := cs.Volume.GetVolumeByID(id)
 	if err != nil {

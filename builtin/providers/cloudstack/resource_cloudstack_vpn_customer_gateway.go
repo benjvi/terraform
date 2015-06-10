@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackVPNCustomerGateway() *schema.Resource {
@@ -69,7 +69,7 @@ func resourceCloudStackVPNCustomerGateway() *schema.Resource {
 }
 
 func resourceCloudStackVPNCustomerGatewayCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.VPN.NewCreateVpnCustomerGatewayParams(
@@ -106,7 +106,7 @@ func resourceCloudStackVPNCustomerGatewayCreate(d *schema.ResourceData, meta int
 }
 
 func resourceCloudStackVPNCustomerGatewayRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the VPN Customer Gateway details
 	v, count, err := cs.VPN.GetVpnCustomerGatewayByID(d.Id())
@@ -135,7 +135,7 @@ func resourceCloudStackVPNCustomerGatewayRead(d *schema.ResourceData, meta inter
 }
 
 func resourceCloudStackVPNCustomerGatewayUpdate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.VPN.NewUpdateVpnCustomerGatewayParams(
@@ -171,7 +171,7 @@ func resourceCloudStackVPNCustomerGatewayUpdate(d *schema.ResourceData, meta int
 }
 
 func resourceCloudStackVPNCustomerGatewayDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.VPN.NewDeleteVpnCustomerGatewayParams(d.Id())

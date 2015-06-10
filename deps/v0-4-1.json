@@ -250,7 +250,7 @@
 			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
 		},
 		{
-			"ImportPath": "github.com/xanzy/go-cloudstack/cloudstack",
+			"ImportPath": "github.com/benjvi/go-cloudstack/cloudstack43",
 			"Comment": "v1.2.0-5-gf73f6ff",
 			"Rev": "f73f6ff1b843dbdac0a01da7b7f39883adfe2bdb"
 		},

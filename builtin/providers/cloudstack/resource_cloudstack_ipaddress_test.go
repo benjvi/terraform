@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackIPAddress_basic(t *testing.T) {
@@ -62,7 +62,7 @@ func testAccCheckCloudStackIPAddressExists(
 			return fmt.Errorf("No IP address ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		pip, _, err := cs.Address.GetPublicIpAddressByID(rs.Primary.ID)
 
 		if err != nil {
@@ -92,7 +92,7 @@ func testAccCheckCloudStackIPAddressAttributes(
 }
 
 func testAccCheckCloudStackIPAddressDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_ipaddress" {

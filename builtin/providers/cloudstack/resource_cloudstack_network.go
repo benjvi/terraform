@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackNetwork() *schema.Resource {
@@ -62,7 +62,7 @@ func resourceCloudStackNetwork() *schema.Resource {
 }
 
 func resourceCloudStackNetworkCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	name := d.Get("name").(string)
 
@@ -131,7 +131,7 @@ func resourceCloudStackNetworkCreate(d *schema.ResourceData, meta interface{}) e
 }
 
 func resourceCloudStackNetworkRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the virtual machine details
 	n, count, err := cs.Network.GetNetworkByID(d.Id())
@@ -157,7 +157,7 @@ func resourceCloudStackNetworkRead(d *schema.ResourceData, meta interface{}) err
 }
 
 func resourceCloudStackNetworkUpdate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	name := d.Get("name").(string)
 
 	// Create a new parameter struct
@@ -202,7 +202,7 @@ func resourceCloudStackNetworkUpdate(d *schema.ResourceData, meta interface{}) e
 }
 
 func resourceCloudStackNetworkDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.Network.NewDeleteNetworkParams(d.Id())

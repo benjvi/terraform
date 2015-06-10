@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackSSHKeyPair_create(t *testing.T) {
@@ -65,7 +65,7 @@ func testAccCheckCloudStackSSHKeyPairExists(n string, sshkey *cloudstack.SSHKeyP
 			return fmt.Errorf("No ssh key name is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		p := cs.SSH.NewListSSHKeyPairsParams()
 		p.SetName(rs.Primary.Attributes["name"])
 		list, err := cs.SSH.ListSSHKeyPairs(p)
@@ -124,7 +124,7 @@ func testAccCheckCloudStackSSHKeyPairCreateAttributes(
 }
 
 func testAccCheckCloudStackSSHKeyPairDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_ssh_keypair" {

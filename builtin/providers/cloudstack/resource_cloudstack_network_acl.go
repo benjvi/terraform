@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackNetworkACL() *schema.Resource {
@@ -39,7 +39,7 @@ func resourceCloudStackNetworkACL() *schema.Resource {
 }
 
 func resourceCloudStackNetworkACLCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	name := d.Get("name").(string)
 
@@ -71,7 +71,7 @@ func resourceCloudStackNetworkACLCreate(d *schema.ResourceData, meta interface{}
 }
 
 func resourceCloudStackNetworkACLRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the network ACL list details
 	f, count, err := cs.NetworkACL.GetNetworkACLListByID(d.Id())
@@ -101,7 +101,7 @@ func resourceCloudStackNetworkACLRead(d *schema.ResourceData, meta interface{}) 
 }
 
 func resourceCloudStackNetworkACLDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.NetworkACL.NewDeleteNetworkACLListParams(d.Id())

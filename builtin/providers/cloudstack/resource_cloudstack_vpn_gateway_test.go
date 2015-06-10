@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackVPNGateway_basic(t *testing.T) {
@@ -42,7 +42,7 @@ func testAccCheckCloudStackVPNGatewayExists(
 			return fmt.Errorf("No VPN Gateway ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		v, _, err := cs.VPN.GetVpnGatewayByID(rs.Primary.ID)
 
 		if err != nil {
@@ -60,7 +60,7 @@ func testAccCheckCloudStackVPNGatewayExists(
 }
 
 func testAccCheckCloudStackVPNGatewayDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_vpn_gateway" {

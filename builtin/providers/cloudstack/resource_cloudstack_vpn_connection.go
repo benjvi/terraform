@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackVPNConnection() *schema.Resource {
@@ -32,7 +32,7 @@ func resourceCloudStackVPNConnection() *schema.Resource {
 }
 
 func resourceCloudStackVPNConnectionCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.VPN.NewCreateVpnConnectionParams(
@@ -52,7 +52,7 @@ func resourceCloudStackVPNConnectionCreate(d *schema.ResourceData, meta interfac
 }
 
 func resourceCloudStackVPNConnectionRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the VPN Connection details
 	v, count, err := cs.VPN.GetVpnConnectionByID(d.Id())
@@ -73,7 +73,7 @@ func resourceCloudStackVPNConnectionRead(d *schema.ResourceData, meta interface{
 }
 
 func resourceCloudStackVPNConnectionDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.VPN.NewDeleteVpnConnectionParams(d.Id())

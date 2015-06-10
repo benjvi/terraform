@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackTemplate_basic(t *testing.T) {
@@ -72,7 +72,7 @@ func testAccCheckCloudStackTemplateExists(
 			return fmt.Errorf("No template ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		tmpl, _, err := cs.Template.GetTemplateByID(rs.Primary.ID, "executable")
 
 		if err != nil {
@@ -138,7 +138,7 @@ func testAccCheckCloudStackTemplateUpdatedAttributes(
 }
 
 func testAccCheckCloudStackTemplateDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_template" {

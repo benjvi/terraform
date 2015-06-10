@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackEgressFirewall_basic(t *testing.T) {
@@ -121,7 +121,7 @@ func testAccCheckCloudStackEgressFirewallRulesExist(n string) resource.TestCheck
 				continue
 			}
 
-			cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+			cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 			_, count, err := cs.Firewall.GetEgressFirewallRuleByID(uuid)
 
 			if err != nil {
@@ -138,7 +138,7 @@ func testAccCheckCloudStackEgressFirewallRulesExist(n string) resource.TestCheck
 }
 
 func testAccCheckCloudStackEgressFirewallDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_egress_firewall" {

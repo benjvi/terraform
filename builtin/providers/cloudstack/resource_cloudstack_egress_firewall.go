@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackEgressFirewall() *schema.Resource {
@@ -82,7 +82,7 @@ func resourceCloudStackEgressFirewall() *schema.Resource {
 }
 
 func resourceCloudStackEgressFirewallCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Make sure all required parameters are there
 	if err := verifyEgressFirewallParams(d); err != nil {
@@ -125,7 +125,7 @@ func resourceCloudStackEgressFirewallCreate(d *schema.ResourceData, meta interfa
 
 func resourceCloudStackEgressFirewallCreateRule(
 	d *schema.ResourceData, meta interface{}, rule map[string]interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	uuids := rule["uuids"].(map[string]interface{})
 
 	// Make sure all required rule parameters are there
@@ -201,7 +201,7 @@ func resourceCloudStackEgressFirewallCreateRule(
 }
 
 func resourceCloudStackEgressFirewallRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create an empty schema.Set to hold all rules
 	rules := &schema.Set{
@@ -400,7 +400,7 @@ func resourceCloudStackEgressFirewallDelete(d *schema.ResourceData, meta interfa
 
 func resourceCloudStackEgressFirewallDeleteRule(
 	d *schema.ResourceData, meta interface{}, rule map[string]interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	uuids := rule["uuids"].(map[string]interface{})
 
 	for k, id := range uuids {

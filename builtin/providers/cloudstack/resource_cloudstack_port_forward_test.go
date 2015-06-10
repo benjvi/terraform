@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackPortForward_basic(t *testing.T) {
@@ -107,7 +107,7 @@ func testAccCheckCloudStackPortForwardsExist(n string) resource.TestCheckFunc {
 				continue
 			}
 
-			cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+			cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 			_, count, err := cs.Firewall.GetPortForwardingRuleByID(uuid)
 
 			if err != nil {
@@ -124,7 +124,7 @@ func testAccCheckCloudStackPortForwardsExist(n string) resource.TestCheckFunc {
 }
 
 func testAccCheckCloudStackPortForwardDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_port_forward" {

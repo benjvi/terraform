@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackVPNGateway() *schema.Resource {
@@ -31,7 +31,7 @@ func resourceCloudStackVPNGateway() *schema.Resource {
 }
 
 func resourceCloudStackVPNGatewayCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Retrieve the VPC UUID
 	vpcid, e := retrieveUUID(cs, "vpc", d.Get("vpc").(string))
@@ -54,7 +54,7 @@ func resourceCloudStackVPNGatewayCreate(d *schema.ResourceData, meta interface{}
 }
 
 func resourceCloudStackVPNGatewayRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the VPN Gateway details
 	v, count, err := cs.VPN.GetVpnGatewayByID(d.Id())
@@ -77,7 +77,7 @@ func resourceCloudStackVPNGatewayRead(d *schema.ResourceData, meta interface{}) 
 }
 
 func resourceCloudStackVPNGatewayDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.VPN.NewDeleteVpnGatewayParams(d.Id())

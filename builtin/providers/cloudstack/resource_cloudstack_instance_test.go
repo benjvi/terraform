@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackInstance_basic(t *testing.T) {
@@ -146,7 +146,7 @@ func testAccCheckCloudStackInstanceExists(
 			return fmt.Errorf("No instance ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		vm, _, err := cs.VirtualMachine.GetVirtualMachineByID(rs.Primary.ID)
 
 		if err != nil {
@@ -212,7 +212,7 @@ func testAccCheckCloudStackInstanceRenamedResizedAndNetworkAdded(
 }
 
 func testAccCheckCloudStackInstanceDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_instance" {

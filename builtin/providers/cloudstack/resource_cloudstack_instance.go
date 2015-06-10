@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackInstance() *schema.Resource {
@@ -91,7 +91,7 @@ func resourceCloudStackInstance() *schema.Resource {
 }
 
 func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	d.Partial(true)
 
 	// Retrieve the service_offering UUID
@@ -187,7 +187,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 }
 
 func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the virtual machine details
 	vm, count, err := cs.VirtualMachine.GetVirtualMachineByID(d.Id())
@@ -220,7 +220,7 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 }
 
 func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	d.Partial(true)
 
 	name := d.Get("name").(string)
@@ -343,7 +343,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 }
 
 func resourceCloudStackInstanceDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.VirtualMachine.NewDestroyVirtualMachineParams(d.Id())

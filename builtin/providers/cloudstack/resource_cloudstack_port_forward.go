@@ -9,7 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackPortForward() *schema.Resource {
@@ -70,7 +70,7 @@ func resourceCloudStackPortForward() *schema.Resource {
 }
 
 func resourceCloudStackPortForwardCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Retrieve the ipaddress UUID
 	ipaddressid, e := retrieveUUID(cs, "ipaddress", d.Get("ipaddress").(string))
@@ -108,7 +108,7 @@ func resourceCloudStackPortForwardCreate(d *schema.ResourceData, meta interface{
 
 func resourceCloudStackPortForwardCreateForward(
 	d *schema.ResourceData, meta interface{}, forward map[string]interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Make sure all required parameters are there
 	if err := verifyPortForwardParams(d, forward); err != nil {
@@ -143,7 +143,7 @@ func resourceCloudStackPortForwardCreateForward(
 }
 
 func resourceCloudStackPortForwardRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create an empty schema.Set to hold all forwards
 	forwards := &schema.Set{
@@ -302,7 +302,7 @@ func resourceCloudStackPortForwardDelete(d *schema.ResourceData, meta interface{
 
 func resourceCloudStackPortForwardDeleteForward(
 	d *schema.ResourceData, meta interface{}, forward map[string]interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create the parameter struct
 	p := cs.Firewall.NewDeletePortForwardingRuleParams(forward["uuid"].(string))

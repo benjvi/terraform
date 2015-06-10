@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackVPC() *schema.Resource {
@@ -50,7 +50,7 @@ func resourceCloudStackVPC() *schema.Resource {
 }
 
 func resourceCloudStackVPCCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	name := d.Get("name").(string)
 
@@ -87,7 +87,7 @@ func resourceCloudStackVPCCreate(d *schema.ResourceData, meta interface{}) error
 }
 
 func resourceCloudStackVPCRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the VPC details
 	v, count, err := cs.VPC.GetVPCByID(d.Id())
@@ -120,7 +120,7 @@ func resourceCloudStackVPCRead(d *schema.ResourceData, meta interface{}) error {
 }
 
 func resourceCloudStackVPCUpdate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Check if the name or display text is changed
 	if d.HasChange("name") || d.HasChange("display_text") {
@@ -147,7 +147,7 @@ func resourceCloudStackVPCUpdate(d *schema.ResourceData, meta interface{}) error
 }
 
 func resourceCloudStackVPCDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.VPC.NewDeleteVPCParams(d.Id())

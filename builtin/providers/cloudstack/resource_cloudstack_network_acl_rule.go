@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackNetworkACLRule() *schema.Resource {
@@ -129,7 +129,7 @@ func resourceCloudStackNetworkACLRuleCreate(d *schema.ResourceData, meta interfa
 
 func resourceCloudStackNetworkACLRuleCreateRule(
 	d *schema.ResourceData, meta interface{}, rule map[string]interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	uuids := rule["uuids"].(map[string]interface{})
 
 	// Make sure all required parameters are there
@@ -224,7 +224,7 @@ func resourceCloudStackNetworkACLRuleCreateRule(
 }
 
 func resourceCloudStackNetworkACLRuleRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create an empty schema.Set to hold all rules
 	rules := &schema.Set{
@@ -452,7 +452,7 @@ func resourceCloudStackNetworkACLRuleDelete(d *schema.ResourceData, meta interfa
 
 func resourceCloudStackNetworkACLRuleDeleteRule(
 	d *schema.ResourceData, meta interface{}, rule map[string]interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	uuids := rule["uuids"].(map[string]interface{})
 
 	for k, id := range uuids {
