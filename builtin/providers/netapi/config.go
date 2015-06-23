@@ -15,3 +15,4 @@ func (c *Config) NewClient() (*netAPI.NetAPIClient, error) {
 	cs := netAPI.NewClient(c.ApiURL, c.ApiKey, c.SecretKey, false)
 	return cs, nil
 }
+
