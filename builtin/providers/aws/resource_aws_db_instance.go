@@ -3,6 +3,7 @@ package aws
 import (
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -73,6 +74,26 @@ func resourceAwsDbInstance() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
+				ValidateFunc: func(v interface{}, k string) (ws []string, errors []error) {
+					value := v.(string)
+					if !regexp.MustCompile(`^[0-9a-z-]+$`).MatchString(value) {
+						errors = append(errors, fmt.Errorf(
+							"only lowercase alphanumeric characters and hyphens allowed in %q", k))
+					}
+					if !regexp.MustCompile(`^[a-z]`).MatchString(value) {
+						errors = append(errors, fmt.Errorf(
+							"first character of %q must be a letter", k))
+					}
+					if regexp.MustCompile(`--`).MatchString(value) {
+						errors = append(errors, fmt.Errorf(
+							"%q cannot contain two consecutive hyphens", k))
+					}
+					if regexp.MustCompile(`-$`).MatchString(value) {
+						errors = append(errors, fmt.Errorf(
+							"%q cannot end with a hyphen"))
+					}
+					return
+				},
 			},
 
 			"instance_class": &schema.Schema{
@@ -153,6 +174,20 @@ func resourceAwsDbInstance() *schema.Resource {
 			"final_snapshot_identifier": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
+				ValidateFunc: func(v interface{}, k string) (ws []string, es []error) {
+					value := v.(string)
+					if !regexp.MustCompile(`^[0-9A-Za-z-]+$`).MatchString(value) {
+						es = append(es, fmt.Errorf(
+							"only alphanumeric characters and hyphens allowed in %q", k))
+					}
+					if regexp.MustCompile(`--`).MatchString(value) {
+						es = append(es, fmt.Errorf("%q cannot contain two consecutive hyphens", k))
+					}
+					if regexp.MustCompile(`-$`).MatchString(value) {
+						es = append(es, fmt.Errorf("%q cannot end in a hyphen", k))
+					}
+					return
+				},
 			},
 
 			"db_subnet_group_name": &schema.Schema{

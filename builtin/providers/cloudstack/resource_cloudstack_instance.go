@@ -56,6 +56,12 @@ func resourceCloudStackInstance() *schema.Resource {
 				ForceNew: true,
 			},
 
+			"project": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
+			},
+
 			"zone": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
@@ -145,6 +151,18 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		p.SetIpaddress(ipaddres.(string))
 	}
 
+	// If there is a project supplied, we retreive and set the project id
+	if project, ok := d.GetOk("project"); ok {
+		// Retrieve the project UUID
+		projectid, e := retrieveUUID(cs, "project", project.(string))
+		if e != nil {
+			return e.Error()
+		}
+		// Set the default project ID
+		p.SetProjectid(projectid)
+	}
+
+	// If a keypair is supplied, add it to the parameter struct
 	if keypair, ok := d.GetOk("keypair"); ok {
 		p.SetKeypair(keypair.(string))
 	}
@@ -153,11 +171,15 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	// added to the parameter struct
 	if userData, ok := d.GetOk("user_data"); ok {
 		ud := base64.StdEncoding.EncodeToString([]byte(userData.(string)))
+		// deployVirtualMachine uses POST, so max userdata is 32K
+		// https://github.com/xanzy/go-cloudstack/commit/c767de689df1faedfec69233763a7c5334bee1f6
+
 		if len(ud) > 32768 {
 			return fmt.Errorf(
 				"The supplied user_data contains %d bytes after encoding, "+
 					"this exeeds the limit of 32768 bytes", len(ud))
 		}
+
 		p.SetUserdata(ud)
 	}
 
@@ -215,6 +237,7 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	}
 	setValueOrUUID(d, "service_offering", vm.Serviceofferingname, vm.Serviceofferingid)
 	setValueOrUUID(d, "template", vm.Templatename, vm.Templateid)
+	setValueOrUUID(d, "project", vm.Project, vm.Projectid)
 
 	return nil
 }

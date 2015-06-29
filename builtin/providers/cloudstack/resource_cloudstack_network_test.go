@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackNetwork_basic(t *testing.T) {
@@ -63,7 +63,7 @@ func testAccCheckCloudStackNetworkExists(
 			return fmt.Errorf("No network ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 		ntwrk, _, err := cs.Network.GetNetworkByID(rs.Primary.ID)
 
 		if err != nil {
@@ -129,7 +129,7 @@ func testAccCheckCloudStackNetworkVPCAttributes(
 }
 
 func testAccCheckCloudStackNetworkDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_network" {
@@ -140,13 +140,9 @@ func testAccCheckCloudStackNetworkDestroy(s *terraform.State) error {
 			return fmt.Errorf("No network ID is set")
 		}
 
-		p := cs.Network.NewDeleteNetworkParams(rs.Primary.ID)
-		_, err := cs.Network.DeleteNetwork(p, true)
-
-		if err != nil {
-			return fmt.Errorf(
-				"Error deleting network (%s): %s",
-				rs.Primary.ID, err)
+		_, _, err := cs.Network.GetNetworkByID(rs.Primary.ID)
+		if err == nil {
+			return fmt.Errorf("Network %s still exists", rs.Primary.ID)
 		}
 	}
 

@@ -24,13 +24,7 @@ func TestAccCloudStackInstance_basic(t *testing.T) {
 						"cloudstack_instance.foobar", &instance),
 					testAccCheckCloudStackInstanceAttributes(&instance),
 					resource.TestCheckResourceAttr(
-						"cloudstack_instance.foobar",
-						"user_data",
-						"0cf3dcdc356ec8369494cb3991985ecd5296cdd5"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_instance.foobar",
-						"keypair",
-						CLOUDSTACK_SSH_KEYPAIR),
+						"cloudstack_instance.foobar", "user_data", "0cf3dcdc356ec8369494cb3991985ecd5296cdd5"),
 				),
 			},
 		},
@@ -52,13 +46,7 @@ func TestAccCloudStackInstance_update(t *testing.T) {
 						"cloudstack_instance.foobar", &instance),
 					testAccCheckCloudStackInstanceAttributes(&instance),
 					resource.TestCheckResourceAttr(
-						"cloudstack_instance.foobar",
-						"user_data",
-						"0cf3dcdc356ec8369494cb3991985ecd5296cdd5"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_instance.foobar",
-						"keypair",
-						CLOUDSTACK_SSH_KEYPAIR),
+						"cloudstack_instance.foobar", "user_data", "0cf3dcdc356ec8369494cb3991985ecd5296cdd5"),
 				),
 			},
 
@@ -128,6 +116,48 @@ func TestAccCloudStackInstance_fixedIP(t *testing.T) {
 						"cloudstack_instance.foobar", &instance),
 					resource.TestCheckResourceAttr(
 						"cloudstack_instance.foobar", "ipaddress", CLOUDSTACK_NETWORK_1_IPADDRESS),
+				),
+			},
+		},
+	})
+}
+
+func TestAccCloudStackInstance_keyPair(t *testing.T) {
+	var instance cloudstack.VirtualMachine
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackInstanceDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccCloudStackInstance_keyPair,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCloudStackInstanceExists(
+						"cloudstack_instance.foobar", &instance),
+					resource.TestCheckResourceAttr(
+						"cloudstack_instance.foobar", "keypair", "terraform-test-keypair"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccCloudStackInstance_project(t *testing.T) {
+	var instance cloudstack.VirtualMachine
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackInstanceDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccCloudStackInstance_project,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCloudStackInstanceExists(
+						"cloudstack_instance.foobar", &instance),
+					resource.TestCheckResourceAttr(
+						"cloudstack_instance.foobar", "project", CLOUDSTACK_PROJECT_NAME),
 				),
 			},
 		},
@@ -244,15 +274,13 @@ resource "cloudstack_instance" "foobar" {
   network = ["%s"]
   template = "%s"
   zone = "%s"
-  keypair = "%s"
   user_data = "foobar\nfoo\nbar"
   expunge = true
 }`,
 	CLOUDSTACK_SERVICE_OFFERING_1,
 	CLOUDSTACK_NETWORK_1,
 	CLOUDSTACK_TEMPLATE,
-	CLOUDSTACK_ZONE,
-	CLOUDSTACK_SSH_KEYPAIR)
+	CLOUDSTACK_ZONE)
 
 var testAccCloudStackInstance_renameResizeAndAddNetwork = fmt.Sprintf(`
 resource "cloudstack_instance" "foobar" {
@@ -262,7 +290,6 @@ resource "cloudstack_instance" "foobar" {
   network = ["%s", "%s"]
   template = "%s"
   zone = "%s"
-  keypair = "%s"
   user_data = "foobar\nfoo\nbar"
   expunge = true
 }`,
@@ -270,8 +297,7 @@ resource "cloudstack_instance" "foobar" {
 	CLOUDSTACK_NETWORK_1,
 	CLOUDSTACK_NETWORK_2,
 	CLOUDSTACK_TEMPLATE,
-	CLOUDSTACK_ZONE,
-	CLOUDSTACK_SSH_KEYPAIR)
+	CLOUDSTACK_ZONE)
 
 var testAccCloudStackInstance_fixedIP = fmt.Sprintf(`
 resource "cloudstack_instance" "foobar" {
@@ -288,4 +314,43 @@ resource "cloudstack_instance" "foobar" {
 	CLOUDSTACK_NETWORK_1,
 	CLOUDSTACK_NETWORK_1_IPADDRESS,
 	CLOUDSTACK_TEMPLATE,
+	CLOUDSTACK_ZONE)
+
+var testAccCloudStackInstance_keyPair = fmt.Sprintf(`
+resource "cloudstack_ssh_keypair" "foo" {
+  name = "terraform-test-keypair"
+}
+
+resource "cloudstack_instance" "foobar" {
+  name = "terraform-test"
+  display_name = "terraform"
+  service_offering= "%s"
+  network = "%s"
+  ipaddress = "%s"
+  template = "%s"
+  zone = "%s"
+	keypair = "${cloudstack_ssh_keypair.foo.name}"
+  expunge = true
+}`,
+	CLOUDSTACK_SERVICE_OFFERING_1,
+	CLOUDSTACK_NETWORK_1,
+	CLOUDSTACK_NETWORK_1_IPADDRESS,
+	CLOUDSTACK_TEMPLATE,
+	CLOUDSTACK_ZONE)
+
+var testAccCloudStackInstance_project = fmt.Sprintf(`
+resource "cloudstack_instance" "foobar" {
+  name = "terraform-test"
+  display_name = "terraform"
+  service_offering= "%s"
+	network = "%s"
+  template = "%s"
+	project = "%s"
+  zone = "%s"
+  expunge = true
+}`,
+	CLOUDSTACK_SERVICE_OFFERING_1,
+	CLOUDSTACK_PROJECT_NETWORK,
+	CLOUDSTACK_TEMPLATE,
+	CLOUDSTACK_PROJECT_NAME,
 	CLOUDSTACK_ZONE)

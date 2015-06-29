@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackNetworkACL_basic(t *testing.T) {
@@ -42,7 +42,7 @@ func testAccCheckCloudStackNetworkACLExists(
 			return fmt.Errorf("No network ACL ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 		acllist, _, err := cs.NetworkACL.GetNetworkACLListByID(rs.Primary.ID)
 		if err != nil {
 			return err
@@ -75,7 +75,7 @@ func testAccCheckCloudStackNetworkACLBasicAttributes(
 }
 
 func testAccCheckCloudStackNetworkACLDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_network_acl" {
@@ -86,13 +86,9 @@ func testAccCheckCloudStackNetworkACLDestroy(s *terraform.State) error {
 			return fmt.Errorf("No network ACL ID is set")
 		}
 
-		p := cs.NetworkACL.NewDeleteNetworkACLListParams(rs.Primary.ID)
-		_, err := cs.NetworkACL.DeleteNetworkACLList(p, true)
-
-		if err != nil {
-			return fmt.Errorf(
-				"Error deleting network ACL (%s): %s",
-				rs.Primary.ID, err)
+		_, _, err := cs.NetworkACL.GetNetworkACLListByID(rs.Primary.ID)
+		if err == nil {
+			return fmt.Errorf("Network ACl list %s still exists", rs.Primary.ID)
 		}
 	}
 

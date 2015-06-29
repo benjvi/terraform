@@ -2,13 +2,13 @@ package azure
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/management"
+	"github.com/Azure/azure-sdk-for-go/management/virtualmachinedisk"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/svanharmelen/azure-sdk-for-go/management/virtualmachinedisk"
 )
 
 func TestAccAzureDataDisk_basic(t *testing.T) {
@@ -101,8 +101,8 @@ func testAccCheckAzureDataDiskExists(
 			return err
 		}
 
-		mc := testAccProvider.Meta().(*Client).mgmtClient
-		d, err := virtualmachinedisk.NewClient(mc).GetDataDisk(vm, vm, vm, lun)
+		vmDiskClient := testAccProvider.Meta().(*Client).vmDiskClient
+		d, err := vmDiskClient.GetDataDisk(vm, vm, vm, lun)
 		if err != nil {
 			return err
 		}
@@ -138,7 +138,7 @@ func testAccCheckAzureDataDiskAttributes(
 }
 
 func testAccCheckAzureDataDiskDestroy(s *terraform.State) error {
-	mc := testAccProvider.Meta().(*Client).mgmtClient
+	vmDiskClient := testAccProvider.Meta().(*Client).vmDiskClient
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "azure_data_disk" {
@@ -155,15 +155,13 @@ func testAccCheckAzureDataDiskDestroy(s *terraform.State) error {
 			return err
 		}
 
-		req, err := virtualmachinedisk.NewClient(mc).DeleteDataDisk(vm, vm, vm, lun, true)
-		if err != nil {
-			return fmt.Errorf("Error deleting Data Disk (%s): %s", rs.Primary.ID, err)
+		_, err = vmDiskClient.GetDataDisk(vm, vm, vm, lun)
+		if err == nil {
+			return fmt.Errorf("Data disk %s still exists", rs.Primary.ID)
 		}
 
-		// Wait until the data disk is deleted
-		if err := mc.WaitForOperation(req, nil); err != nil {
-			return fmt.Errorf(
-				"Error deleting Data Disk (%s): %s", rs.Primary.ID, err)
+		if !management.IsResourceNotFoundError(err) {
+			return err
 		}
 	}
 
@@ -175,7 +173,7 @@ resource "azure_instance" "foo" {
     name = "terraform-test"
     image = "Ubuntu Server 14.04 LTS"
     size = "Basic_A1"
-    storage = "%s"
+    storage_service_name = "%s"
     location = "West US"
     username = "terraform"
     password = "Pass!admin123"
@@ -184,16 +182,16 @@ resource "azure_instance" "foo" {
 resource "azure_data_disk" "foo" {
     lun = 0
     size = 10
-    storage = "${azure_instance.foo.storage}"
+    storage_service_name = "${azure_instance.foo.storage_service_name}"
     virtual_machine = "${azure_instance.foo.id}"
-}`, os.Getenv("AZURE_STORAGE"))
+}`, testAccStorageServiceName)
 
 var testAccAzureDataDisk_advanced = fmt.Sprintf(`
 resource "azure_instance" "foo" {
     name = "terraform-test1"
     image = "Ubuntu Server 14.04 LTS"
     size = "Basic_A1"
-    storage = "%s"
+    storage_service_name = "%s"
     location = "West US"
     username = "terraform"
     password = "Pass!admin123"
@@ -203,16 +201,16 @@ resource "azure_data_disk" "foo" {
     lun = 1
     size = 10
     caching = "ReadOnly"
-    storage = "${azure_instance.foo.storage}"
+    storage_service_name = "${azure_instance.foo.storage_service_name}"
     virtual_machine = "${azure_instance.foo.id}"
-}`, os.Getenv("AZURE_STORAGE"))
+}`, testAccStorageServiceName)
 
 var testAccAzureDataDisk_update = fmt.Sprintf(`
 resource "azure_instance" "foo" {
     name = "terraform-test1"
     image = "Ubuntu Server 14.04 LTS"
     size = "Basic_A1"
-    storage = "%s"
+    storage_service_name = "%s"
     location = "West US"
     username = "terraform"
     password = "Pass!admin123"
@@ -222,7 +220,7 @@ resource "azure_instance" "bar" {
     name = "terraform-test2"
     image = "Ubuntu Server 14.04 LTS"
     size = "Basic_A1"
-    storage = "${azure_instance.foo.storage}"
+    storage_service_name = "${azure_instance.foo.storage_service_name}"
     location = "West US"
     username = "terraform"
     password = "Pass!admin123"
@@ -232,6 +230,6 @@ resource "azure_data_disk" "foo" {
     lun = 2
     size = 20
     caching = "ReadWrite"
-    storage = "${azure_instance.bar.storage}"
+    storage_service_name = "${azure_instance.bar.storage_service_name}"
     virtual_machine = "${azure_instance.bar.id}"
-}`, os.Getenv("AZURE_STORAGE"))
+}`, testAccStorageServiceName)

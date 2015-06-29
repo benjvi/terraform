@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackVPNConnection_basic(t *testing.T) {
@@ -42,7 +42,7 @@ func testAccCheckCloudStackVPNConnectionExists(
 			return fmt.Errorf("No VPN Connection ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 		v, _, err := cs.VPN.GetVpnConnectionByID(rs.Primary.ID)
 
 		if err != nil {
@@ -60,7 +60,7 @@ func testAccCheckCloudStackVPNConnectionExists(
 }
 
 func testAccCheckCloudStackVPNConnectionDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_vpn_connection" {
@@ -71,13 +71,9 @@ func testAccCheckCloudStackVPNConnectionDestroy(s *terraform.State) error {
 			return fmt.Errorf("No VPN Connection ID is set")
 		}
 
-		p := cs.VPN.NewDeleteVpnConnectionParams(rs.Primary.ID)
-		_, err := cs.VPN.DeleteVpnConnection(p, true)
-
-		if err != nil {
-			return fmt.Errorf(
-				"Error deleting VPN Connection (%s): %s",
-				rs.Primary.ID, err)
+		_, _, err := cs.VPN.GetVpnConnectionByID(rs.Primary.ID)
+		if err == nil {
+			return fmt.Errorf("VPN Connection %s still exists", rs.Primary.ID)
 		}
 	}
 

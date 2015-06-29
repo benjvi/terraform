@@ -35,7 +35,7 @@ func TestAccCloudStackDisk_device(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckCloudStackDiskDestroyAdvanced,
+		CheckDestroy: testAccCheckCloudStackDiskDestroy,
 		Steps: []resource.TestStep{
 			resource.TestStep{
 				Config: testAccCloudStackDisk_device,
@@ -57,7 +57,7 @@ func TestAccCloudStackDisk_update(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckCloudStackDiskDestroyAdvanced,
+		CheckDestroy: testAccCheckCloudStackDiskDestroy,
 		Steps: []resource.TestStep{
 			resource.TestStep{
 				Config: testAccCloudStackDisk_update,

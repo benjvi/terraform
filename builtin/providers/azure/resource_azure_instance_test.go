@@ -2,13 +2,12 @@ package azure
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/management"
+	"github.com/Azure/azure-sdk-for-go/management/virtualmachine"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/svanharmelen/azure-sdk-for-go/management/hostedservice"
-	"github.com/svanharmelen/azure-sdk-for-go/management/virtualmachine"
 )
 
 func TestAccAzureInstance_basic(t *testing.T) {
@@ -17,16 +16,46 @@ func TestAccAzureInstance_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAzureInstanceDestroy,
+		CheckDestroy: testAccCheckAzureInstanceDestroyed(""),
 		Steps: []resource.TestStep{
 			resource.TestStep{
 				Config: testAccAzureInstance_basic,
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAzureInstanceExists(
-						"azure_instance.foo", &dpmt),
+						"azure_instance.foo", "", &dpmt),
 					testAccCheckAzureInstanceBasicAttributes(&dpmt),
 					resource.TestCheckResourceAttr(
 						"azure_instance.foo", "name", "terraform-test"),
+					resource.TestCheckResourceAttr(
+						"azure_instance.foo", "hosted_service_name", "terraform-test"),
+					resource.TestCheckResourceAttr(
+						"azure_instance.foo", "location", "West US"),
+					resource.TestCheckResourceAttr(
+						"azure_instance.foo", "endpoint.2462817782.public_port", "22"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccAzureInstance_separateHostedService(t *testing.T) {
+	var dpmt virtualmachine.DeploymentResponse
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckAzureInstanceDestroyed(testAccHostedServiceName),
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccAzureInstance_seperateHostedService,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAzureInstanceExists(
+						"azure_instance.foo", testAccHostedServiceName, &dpmt),
+					testAccCheckAzureInstanceBasicAttributes(&dpmt),
+					resource.TestCheckResourceAttr(
+						"azure_instance.foo", "name", "terraform-test"),
+					resource.TestCheckResourceAttr(
+						"azure_instance.foo", "hosted_service_name", "terraform-testing-service"),
 					resource.TestCheckResourceAttr(
 						"azure_instance.foo", "location", "West US"),
 					resource.TestCheckResourceAttr(
@@ -43,16 +72,18 @@ func TestAccAzureInstance_advanced(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAzureInstanceDestroy,
+		CheckDestroy: testAccCheckAzureInstanceDestroyed(""),
 		Steps: []resource.TestStep{
 			resource.TestStep{
 				Config: testAccAzureInstance_advanced,
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAzureInstanceExists(
-						"azure_instance.foo", &dpmt),
+						"azure_instance.foo", "", &dpmt),
 					testAccCheckAzureInstanceAdvancedAttributes(&dpmt),
 					resource.TestCheckResourceAttr(
 						"azure_instance.foo", "name", "terraform-test1"),
+					resource.TestCheckResourceAttr(
+						"azure_instance.foo", "hosted_service_name", "terraform-test1"),
 					resource.TestCheckResourceAttr(
 						"azure_instance.foo", "size", "Basic_A1"),
 					resource.TestCheckResourceAttr(
@@ -75,16 +106,18 @@ func TestAccAzureInstance_update(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAzureInstanceDestroy,
+		CheckDestroy: testAccCheckAzureInstanceDestroyed(""),
 		Steps: []resource.TestStep{
 			resource.TestStep{
 				Config: testAccAzureInstance_advanced,
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAzureInstanceExists(
-						"azure_instance.foo", &dpmt),
+						"azure_instance.foo", "", &dpmt),
 					testAccCheckAzureInstanceAdvancedAttributes(&dpmt),
 					resource.TestCheckResourceAttr(
 						"azure_instance.foo", "name", "terraform-test1"),
+					resource.TestCheckResourceAttr(
+						"azure_instance.foo", "hosted_service_name", "terraform-test1"),
 					resource.TestCheckResourceAttr(
 						"azure_instance.foo", "size", "Basic_A1"),
 					resource.TestCheckResourceAttr(
@@ -102,7 +135,7 @@ func TestAccAzureInstance_update(t *testing.T) {
 				Config: testAccAzureInstance_update,
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAzureInstanceExists(
-						"azure_instance.foo", &dpmt),
+						"azure_instance.foo", "", &dpmt),
 					testAccCheckAzureInstanceUpdatedAttributes(&dpmt),
 					resource.TestCheckResourceAttr(
 						"azure_instance.foo", "size", "Basic_A2"),
@@ -120,6 +153,7 @@ func TestAccAzureInstance_update(t *testing.T) {
 
 func testAccCheckAzureInstanceExists(
 	n string,
+	hostedServiceName string,
 	dpmt *virtualmachine.DeploymentResponse) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
@@ -131,8 +165,17 @@ func testAccCheckAzureInstanceExists(
 			return fmt.Errorf("No instance ID is set")
 		}
 
-		mc := testAccProvider.Meta().(*Client).mgmtClient
-		vm, err := virtualmachine.NewClient(mc).GetDeployment(rs.Primary.ID, rs.Primary.ID)
+		// if not hosted service was provided; it means that we expect it
+		// to be identical with the name of the instance; which is in the ID.
+		var serviceName string
+		if hostedServiceName == "" {
+			serviceName = rs.Primary.ID
+		} else {
+			serviceName = hostedServiceName
+		}
+
+		vmClient := testAccProvider.Meta().(*Client).vmClient
+		vm, err := vmClient.GetDeployment(serviceName, rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -282,31 +325,40 @@ func testAccCheckAzureInstanceUpdatedAttributes(
 	}
 }
 
-func testAccCheckAzureInstanceDestroy(s *terraform.State) error {
-	mc := testAccProvider.Meta().(*Client).mgmtClient
+func testAccCheckAzureInstanceDestroyed(hostedServiceName string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		hostedServiceClient := testAccProvider.Meta().(*Client).hostedServiceClient
 
-	for _, rs := range s.RootModule().Resources {
-		if rs.Type != "azure_instance" {
-			continue
+		for _, rs := range s.RootModule().Resources {
+			if rs.Type != "azure_instance" {
+				continue
+			}
+
+			if rs.Primary.ID == "" {
+				return fmt.Errorf("No instance ID is set")
+			}
+
+			// if not hosted service was provided; it means that we expect it
+			// to be identical with the name of the instance; which is in the ID.
+			var serviceName string
+			if hostedServiceName == "" {
+				serviceName = rs.Primary.ID
+			} else {
+				serviceName = hostedServiceName
+			}
+
+			_, err := hostedServiceClient.GetHostedService(serviceName)
+			if err == nil {
+				return fmt.Errorf("Instance %s still exists", rs.Primary.ID)
+			}
+
+			if !management.IsResourceNotFoundError(err) {
+				return err
+			}
 		}
 
-		if rs.Primary.ID == "" {
-			return fmt.Errorf("No instance ID is set")
-		}
-
-		req, err := hostedservice.NewClient(mc).DeleteHostedService(rs.Primary.ID, true)
-		if err != nil {
-			return fmt.Errorf("Error deleting instance (%s): %s", rs.Primary.ID, err)
-		}
-
-		// Wait until the instance is deleted
-		if err := mc.WaitForOperation(req, nil); err != nil {
-			return fmt.Errorf(
-				"Error deleting instance (%s): %s", rs.Primary.ID, err)
-		}
+		return nil
 	}
-
-	return nil
 }
 
 var testAccAzureInstance_basic = fmt.Sprintf(`
@@ -314,7 +366,7 @@ resource "azure_instance" "foo" {
     name = "terraform-test"
     image = "Ubuntu Server 14.04 LTS"
     size = "Basic_A1"
-    storage = "%s"
+    storage_service_name = "%s"
     location = "West US"
     username = "terraform"
     password = "Pass!admin123"
@@ -325,7 +377,32 @@ resource "azure_instance" "foo" {
         public_port = 22
         private_port = 22
     }
-}`, os.Getenv("AZURE_STORAGE"))
+}`, testAccStorageServiceName)
+
+var testAccAzureInstance_seperateHostedService = fmt.Sprintf(`
+resource "azure_hosted_service" "foo" {
+	name = "%s"
+	location = "West US"
+	ephemeral_contents = true
+}
+
+resource "azure_instance" "foo" {
+    name = "terraform-test"
+	hosted_service_name = "${azure_hosted_service.foo.name}"
+    image = "Ubuntu Server 14.04 LTS"
+    size = "Basic_A1"
+    storage_service_name = "%s"
+    location = "West US"
+    username = "terraform"
+    password = "Pass!admin123"
+
+    endpoint {
+        name = "SSH"
+        protocol = "tcp"
+        public_port = 22
+        private_port = 22
+    }
+}`, testAccHostedServiceName, testAccStorageServiceName)
 
 var testAccAzureInstance_advanced = fmt.Sprintf(`
 resource "azure_virtual_network" "foo" {
@@ -347,23 +424,26 @@ resource "azure_virtual_network" "foo" {
 resource "azure_security_group" "foo" {
     name = "terraform-security-group1"
     location = "West US"
+}
 
-    rule {
-        name = "rdp"
-        priority = 101
-        source_cidr = "*"
-        source_port = "*"
-        destination_cidr = "*"
-        destination_port = 3389
-        protocol = "TCP"
-    }
+resource "azure_security_group_rule" "foo" {
+    name = "rdp"
+    security_group_names = ["${azure_security_group.foo.name}"]
+    priority = 101
+    source_address_prefix = "*"
+    source_port_range = "*"
+    destination_address_prefix = "*"
+    destination_port_range = "3389"
+	action = "Deny"
+	type = "Inbound"
+    protocol = "TCP"
 }
 
 resource "azure_instance" "foo" {
     name = "terraform-test1"
     image = "Windows Server 2012 R2 Datacenter, April 2015"
     size = "Basic_A1"
-    storage = "%s"
+    storage_service_name = "%s"
     location = "West US"
     time_zone = "America/Los_Angeles"
     subnet = "subnet1"
@@ -378,7 +458,7 @@ resource "azure_instance" "foo" {
         public_port = 3389
         private_port = 3389
     }
-}`, os.Getenv("AZURE_STORAGE"))
+}`, testAccStorageServiceName)
 
 var testAccAzureInstance_update = fmt.Sprintf(`
 resource "azure_virtual_network" "foo" {
@@ -386,52 +466,58 @@ resource "azure_virtual_network" "foo" {
     address_space = ["10.1.2.0/24"]
 		location = "West US"
 
-		subnet {
+    subnet {
         name = "subnet1"
-				address_prefix = "10.1.2.0/25"
-		}
+		address_prefix = "10.1.2.0/25"
+	}
 
-		subnet {
+    subnet {
         name = "subnet2"
-				address_prefix = "10.1.2.128/25"
+		address_prefix = "10.1.2.128/25"
     }
 }
 
 resource "azure_security_group" "foo" {
     name = "terraform-security-group1"
     location = "West US"
+}
 
-    rule {
-        name = "rdp"
-        priority = 101
-        source_cidr = "*"
-        source_port = "*"
-        destination_cidr = "*"
-        destination_port = 3389
-        protocol = "TCP"
-    }
+resource "azure_security_group_rule" "foo" {
+    name = "rdp"
+    security_group_names = ["${azure_security_group.foo.name}"]
+    priority = 101
+    source_address_prefix = "*"
+    source_port_range = "*"
+    destination_address_prefix = "*"
+    destination_port_range = "3389"
+	type = "Inbound"
+	action = "Deny"
+    protocol = "TCP"
 }
 
 resource "azure_security_group" "bar" {
     name = "terraform-security-group2"
     location = "West US"
+}
 
-    rule {
-        name = "rdp"
-        priority = 101
-        source_cidr = "192.168.0.0/24"
-        source_port = "*"
-        destination_cidr = "*"
-        destination_port = 3389
-        protocol = "TCP"
-    }
+resource "azure_security_group_rule" "bar" {
+    name = "rdp"
+    security_group_names = ["${azure_security_group.bar.name}"]
+    priority = 101
+    source_address_prefix = "192.168.0.0/24"
+    source_port_range = "*"
+    destination_address_prefix = "*"
+    destination_port_range = "3389"
+	type = "Inbound"
+	action = "Deny"
+    protocol = "TCP"
 }
 
 resource "azure_instance" "foo" {
     name = "terraform-test1"
     image = "Windows Server 2012 R2 Datacenter, April 2015"
     size = "Basic_A2"
-    storage = "%s"
+    storage_service_name = "%s"
     location = "West US"
     time_zone = "America/Los_Angeles"
     subnet = "subnet1"
@@ -453,4 +539,4 @@ resource "azure_instance" "foo" {
         public_port = 5985
         private_port = 5985
     }
-}`, os.Getenv("AZURE_STORAGE"))
+}`, testAccStorageServiceName)

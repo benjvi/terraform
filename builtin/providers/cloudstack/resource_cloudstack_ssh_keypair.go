@@ -2,11 +2,13 @@ package cloudstack
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/mitchellh/go-homedir"
 )
 
 func resourceCloudStackSSHKeyPair() *schema.Resource {
@@ -49,28 +51,34 @@ func resourceCloudStackSSHKeyPairCreate(d *schema.ResourceData, meta interface{}
 	publicKey := d.Get("public_key").(string)
 
 	if publicKey != "" {
-		//register key supplied
-		p := cs.SSH.NewRegisterSSHKeyPairParams(name, publicKey)
-		r, err := cs.SSH.RegisterSSHKeyPair(p)
+		// Register supplied key
+		keyPath, err := homedir.Expand(publicKey)
+		if err != nil {
+			return fmt.Errorf("Error expanding the public key path: %v", err)
+		}
+
+		key, err := ioutil.ReadFile(keyPath)
+		if err != nil {
+			return fmt.Errorf("Error reading the public key: %v", err)
+		}
+
+		p := cs.SSH.NewRegisterSSHKeyPairParams(name, string(key))
+		_, err = cs.SSH.RegisterSSHKeyPair(p)
 		if err != nil {
 			return err
 		}
-		log.Printf("[DEBUG] RegisterSSHKeyPair response: %+v\n", r)
-		log.Printf("[DEBUG] Key pair successfully registered at Cloudstack")
-		d.SetId(name)
 	} else {
-		//no key supplied, must create one and return the private key
+		// No key supplied, must create one and return the private key
 		p := cs.SSH.NewCreateSSHKeyPairParams(name)
 		r, err := cs.SSH.CreateSSHKeyPair(p)
 		if err != nil {
 			return err
 		}
-		log.Printf("[DEBUG] CreateSSHKeyPair response: %+v\n", r)
-		log.Printf("[DEBUG] Key pair successfully generated at Cloudstack")
-		log.Printf("[DEBUG] Private key returned: %s", r.Privatekey)
 		d.Set("private_key", r.Privatekey)
-		d.SetId(name)
 	}
+
+	log.Printf("[DEBUG] Key pair successfully generated at Cloudstack")
+	d.SetId(name)
 
 	return resourceCloudStackSSHKeyPairRead(d, meta)
 }
@@ -81,19 +89,19 @@ func resourceCloudStackSSHKeyPairRead(d *schema.ResourceData, meta interface{}) 
 	log.Printf("[DEBUG] looking for ssh key  %s with name %s", d.Id(), d.Get("name").(string))
 	p := cs.SSH.NewListSSHKeyPairsParams()
 	p.SetName(d.Get("name").(string))
+
 	r, err := cs.SSH.ListSSHKeyPairs(p)
 	if err != nil {
 		return err
 	}
 	if r.Count == 0 {
-		log.Printf("[DEBUG] Key pair %s does not exist", d.Get("name").(string))
-		d.Set("name", "")
+		log.Printf("[DEBUG] Key pair %s does not exist", d.Id())
+		d.SetId("")
 		return nil
 	}
 	//SSHKeyPair name is unique in a cloudstack account so dont need to check for multiple
 	d.Set("name", r.SSHKeyPairs[0].Name)
 	d.Set("fingerprint", r.SSHKeyPairs[0].Fingerprint)
-	log.Printf("[DEBUG] Read ssh key pair %+v\n", d)
 
 	return nil
 }
@@ -102,18 +110,18 @@ func resourceCloudStackSSHKeyPairDelete(d *schema.ResourceData, meta interface{}
 	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
-	p := cs.SSH.NewDeleteSSHKeyPairParams(d.Get("name").(string))
+	p := cs.SSH.NewDeleteSSHKeyPairParams(d.Id())
 
 	// Remove the SSH Keypair
 	_, err := cs.SSH.DeleteSSHKeyPair(p)
 	if err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(
-			"A key pair with name '%s' does not exist for account", d.Get("name").(string))) {
+			"A key pair with name '%s' does not exist for account", d.Id())) {
 			return nil
 		}
 
-		return fmt.Errorf("Error deleting SSH Keypair: %s", err)
+		return fmt.Errorf("Error deleting key pair: %s", err)
 	}
 
 	return nil

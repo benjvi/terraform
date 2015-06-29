@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackVPC_basic(t *testing.T) {
@@ -43,7 +43,7 @@ func testAccCheckCloudStackVPCExists(
 			return fmt.Errorf("No VPC ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 		v, _, err := cs.VPC.GetVPCByID(rs.Primary.ID)
 
 		if err != nil {
@@ -81,7 +81,7 @@ func testAccCheckCloudStackVPCAttributes(
 }
 
 func testAccCheckCloudStackVPCDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_vpc" {
@@ -92,13 +92,9 @@ func testAccCheckCloudStackVPCDestroy(s *terraform.State) error {
 			return fmt.Errorf("No VPC ID is set")
 		}
 
-		p := cs.VPC.NewDeleteVPCParams(rs.Primary.ID)
-		_, err := cs.VPC.DeleteVPC(p, true)
-
-		if err != nil {
-			return fmt.Errorf(
-				"Error deleting VPC (%s): %s",
-				rs.Primary.ID, err)
+		_, _, err := cs.VPC.GetVPCByID(rs.Primary.ID)
+		if err == nil {
+			return fmt.Errorf("VPC %s still exists", rs.Primary.ID)
 		}
 	}
 

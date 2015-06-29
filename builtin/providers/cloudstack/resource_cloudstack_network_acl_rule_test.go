@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackNetworkACLRule_basic(t *testing.T) {
@@ -127,7 +127,7 @@ func testAccCheckCloudStackNetworkACLRulesExist(n string) resource.TestCheckFunc
 				continue
 			}
 
-			cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+			cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 			_, count, err := cs.NetworkACL.GetNetworkACLByID(uuid)
 
 			if err != nil {
@@ -144,7 +144,7 @@ func testAccCheckCloudStackNetworkACLRulesExist(n string) resource.TestCheckFunc
 }
 
 func testAccCheckCloudStackNetworkACLRuleDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_network_acl_rule" {
@@ -160,11 +160,9 @@ func testAccCheckCloudStackNetworkACLRuleDestroy(s *terraform.State) error {
 				continue
 			}
 
-			p := cs.NetworkACL.NewDeleteNetworkACLParams(uuid)
-			_, err := cs.NetworkACL.DeleteNetworkACL(p, true)
-
-			if err != nil {
-				return err
+			_, _, err := cs.NetworkACL.GetNetworkACLByID(uuid)
+			if err == nil {
+				return fmt.Errorf("Network ACL rule %s still exists", rs.Primary.ID)
 			}
 		}
 	}

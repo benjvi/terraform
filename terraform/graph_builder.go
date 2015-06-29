@@ -116,13 +116,13 @@ func (b *BuiltinGraphBuilder) Steps(path []string) []GraphTransformer {
 		// Provider-related transformations
 		&MissingProviderTransformer{Providers: b.Providers},
 		&ProviderTransformer{},
-		&PruneProviderTransformer{},
+		&CloseProviderTransformer{},
 		&DisableProviderTransformer{},
 
 		// Provisioner-related transformations
 		&MissingProvisionerTransformer{Provisioners: b.Provisioners},
 		&ProvisionerTransformer{},
-		&PruneProvisionerTransformer{},
+		&CloseProvisionerTransformer{},
 
 		// Run our vertex-level transforms
 		&VertexTransformer{
@@ -152,6 +152,12 @@ func (b *BuiltinGraphBuilder) Steps(path []string) []GraphTransformer {
 	// We don't do the following for modules.
 	if len(path) <= 1 {
 		steps = append(steps,
+			// Prune the providers and provisioners. This must happen
+			// only once because flattened modules might depend on empty
+			// providers.
+			&PruneProviderTransformer{},
+			&PruneProvisionerTransformer{},
+
 			// Create the destruction nodes
 			&DestroyTransformer{FullDestroy: b.Destroy},
 			&CreateBeforeDestroyTransformer{},

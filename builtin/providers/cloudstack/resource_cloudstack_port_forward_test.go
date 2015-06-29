@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackPortForward_basic(t *testing.T) {
@@ -107,7 +107,7 @@ func testAccCheckCloudStackPortForwardsExist(n string) resource.TestCheckFunc {
 				continue
 			}
 
-			cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+			cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 			_, count, err := cs.Firewall.GetPortForwardingRuleByID(uuid)
 
 			if err != nil {
@@ -124,7 +124,7 @@ func testAccCheckCloudStackPortForwardsExist(n string) resource.TestCheckFunc {
 }
 
 func testAccCheckCloudStackPortForwardDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_port_forward" {
@@ -140,11 +140,9 @@ func testAccCheckCloudStackPortForwardDestroy(s *terraform.State) error {
 				continue
 			}
 
-			p := cs.Firewall.NewDeletePortForwardingRuleParams(uuid)
-			_, err := cs.Firewall.DeletePortForwardingRule(p, true)
-
-			if err != nil {
-				return err
+			_, _, err := cs.Firewall.GetPortForwardingRuleByID(uuid)
+			if err == nil {
+				return fmt.Errorf("Port forward %s still exists", rs.Primary.ID)
 			}
 		}
 	}

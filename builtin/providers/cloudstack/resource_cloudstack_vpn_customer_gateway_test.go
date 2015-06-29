@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackVPNCustomerGateway_basic(t *testing.T) {
@@ -94,7 +94,7 @@ func testAccCheckCloudStackVPNCustomerGatewayExists(
 			return fmt.Errorf("No VPN CustomerGateway ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 		v, _, err := cs.VPN.GetVpnCustomerGatewayByID(rs.Primary.ID)
 
 		if err != nil {
@@ -152,7 +152,7 @@ func testAccCheckCloudStackVPNCustomerGatewayUpdatedAttributes(
 }
 
 func testAccCheckCloudStackVPNCustomerGatewayDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_vpn_customer_gateway" {
@@ -163,13 +163,9 @@ func testAccCheckCloudStackVPNCustomerGatewayDestroy(s *terraform.State) error {
 			return fmt.Errorf("No VPN Customer Gateway ID is set")
 		}
 
-		p := cs.VPN.NewDeleteVpnCustomerGatewayParams(rs.Primary.ID)
-		_, err := cs.VPN.DeleteVpnCustomerGateway(p, true)
-
-		if err != nil {
-			return fmt.Errorf(
-				"Error deleting VPN Customer Gateway (%s): %s",
-				rs.Primary.ID, err)
+		_, _, err := cs.VPN.GetVpnCustomerGatewayByID(rs.Primary.ID)
+		if err == nil {
+			return fmt.Errorf("VPN Customer Gateway %s still exists", rs.Primary.ID)
 		}
 	}
 

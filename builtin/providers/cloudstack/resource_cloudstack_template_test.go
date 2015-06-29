@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackTemplate_basic(t *testing.T) {
@@ -72,7 +72,7 @@ func testAccCheckCloudStackTemplateExists(
 			return fmt.Errorf("No template ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 		tmpl, _, err := cs.Template.GetTemplateByID(rs.Primary.ID, "executable")
 
 		if err != nil {
@@ -138,7 +138,7 @@ func testAccCheckCloudStackTemplateUpdatedAttributes(
 }
 
 func testAccCheckCloudStackTemplateDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_template" {
@@ -149,13 +149,9 @@ func testAccCheckCloudStackTemplateDestroy(s *terraform.State) error {
 			return fmt.Errorf("No template ID is set")
 		}
 
-		p := cs.Template.NewDeleteTemplateParams(rs.Primary.ID)
-		_, err := cs.Template.DeleteTemplate(p, true)
-
-		if err != nil {
-			return fmt.Errorf(
-				"Error deleting template (%s): %s",
-				rs.Primary.ID, err)
+		_, _, err := cs.Template.GetTemplateByID(rs.Primary.ID, "executable")
+		if err == nil {
+			return fmt.Errorf("Template %s still exists", rs.Primary.ID)
 		}
 	}
 

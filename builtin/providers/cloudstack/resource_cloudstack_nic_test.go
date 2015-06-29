@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/xanzy/go-cloudstack/cloudstack"
 )
 
 func TestAccCloudStackNIC_basic(t *testing.T) {
@@ -81,7 +81,7 @@ func testAccCheckCloudStackNICExists(
 			return fmt.Errorf("No NIC ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 		vm, _, err := cs.VirtualMachine.GetVirtualMachineByID(rsv.Primary.ID)
 
 		if err != nil {
@@ -128,7 +128,7 @@ func testAccCheckCloudStackNICIPAddress(
 }
 
 func testAccCheckCloudStackNICDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
 
 	// Deleting the instance automatically deletes any additional NICs
 	for _, rs := range s.RootModule().Resources {
@@ -140,13 +140,9 @@ func testAccCheckCloudStackNICDestroy(s *terraform.State) error {
 			return fmt.Errorf("No instance ID is set")
 		}
 
-		p := cs.VirtualMachine.NewDestroyVirtualMachineParams(rs.Primary.ID)
-		_, err := cs.VirtualMachine.DestroyVirtualMachine(p, true)
-
-		if err != nil {
-			return fmt.Errorf(
-				"Error deleting instance (%s): %s",
-				rs.Primary.ID, err)
+		_, _, err := cs.VirtualMachine.GetVirtualMachineByID(rs.Primary.ID)
+		if err == nil {
+			return fmt.Errorf("Virtual Machine %s still exists", rs.Primary.ID)
 		}
 	}
 
