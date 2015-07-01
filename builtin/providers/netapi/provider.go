@@ -26,6 +26,12 @@ func Provider() terraform.ResourceProvider {
 				Required:    true,
 				DefaultFunc: schema.EnvDefaultFunc("NETAPI_SECRET_KEY", nil),
 			},
+
+			"acronym": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
@@ -42,6 +48,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		ApiURL:    d.Get("api_url").(string),
 		ApiKey:    d.Get("api_key").(string),
 		SecretKey: d.Get("secret_key").(string),
+		Acronym:   d.Get("acronym").(string),
 	}
 
 	return config.NewClient()

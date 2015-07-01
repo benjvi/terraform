@@ -1,20 +1,20 @@
-package netapi 
+package netapi
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/benjvi/go-net-api"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-net-api"
 )
 
 func TestAccNetAPIPrivateDirectConnect_createAndUpdate(t *testing.T) {
 	var vpn netAPI.Network
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: testAccProviders,
 		Steps: []resource.TestStep{
 			resource.TestStep{
 				Config: testAccNetAPIPrivateDirectConnect_one,
@@ -35,7 +35,6 @@ func TestAccNetAPIPrivateDirectConnect_createAndUpdate(t *testing.T) {
 		},
 	})
 }
-
 
 func testAccCheckNetAPIPrivateDirectConnectExists(
 	n string, vpn *netAPI.Network) resource.TestCheckFunc {
@@ -121,6 +120,7 @@ func testAccCheckNetAPIPrivateDirectConnectAttributesTwo(
 		return nil
 	}
 }
+
 var testAccNetAPIPrivateDirectConnect_one = fmt.Sprintf(`
 resource "netapi_private_direct_connect" "foo" {
     display_text = "terraform-acctest-vpn-1"
@@ -128,10 +128,10 @@ resource "netapi_private_direct_connect" "foo" {
     cidr = "10.0.31.0/24"
     gateway = "10.0.31.1"
     dcg = "%s"
-
+    region = 'europe'
 }`,
-NETAPI_ZONE,
-NETAPI_DCG)
+	NETAPI_ZONE,
+	NETAPI_DCG)
 
 var testAccNetAPIPrivateDirectConnect_two = fmt.Sprintf(`
 resource "netapi_private_direct_connect" "foo" {
@@ -140,8 +140,7 @@ resource "netapi_private_direct_connect" "foo" {
     cidr = "10.0.32.0/24"
     gateway = "10.0.32.1"
     dcg = "%s"
-
+    region = "europe"
 }`,
-NETAPI_ZONE,
-NETAPI_DCG)
-
+	NETAPI_ZONE,
+	NETAPI_DCG)
