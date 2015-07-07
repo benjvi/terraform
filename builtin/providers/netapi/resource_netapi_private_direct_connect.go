@@ -43,6 +43,12 @@ func resourceNetAPIPrivateDirectConnect() *schema.Resource {
 				ForceNew: true,
 			},
 
+			"region": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+				ForceNew: true,
+			},
+
 			"sid": &schema.Schema{
 				Type:     schema.TypeString,
 				Computed: true,
@@ -70,10 +76,14 @@ func resourceNetAPIPrivateDirectConnectCreate(d *schema.ResourceData, meta inter
 	cs := meta.(*netAPI.NetAPIClient)
 
 	displaytext := d.Get("display_text").(string)
+	region := d.Get("region").(string)
 
-	p := cs.Network.NewListNetworksParams()
+	p := cs.Network.NewListNetworksParams(region)
 	p.SetSubtype("privatedirectconnect")
 	r, err := cs.Network.ListNetworks(p)
+	if err != nil {
+		return fmt.Errorf("Error checking for existing private direct connect %s: %s", displaytext, err)
+	}
 
 	// Can't search directly for displaytext, so we must filter the list of all VPNs
 	fr := make([]*netAPI.Network, 0, len(r.Networks))
@@ -83,9 +93,6 @@ func resourceNetAPIPrivateDirectConnectCreate(d *schema.ResourceData, meta inter
 		}
 	}
 
-	if err != nil {
-		return fmt.Errorf("Error checking for existing private direct connect %s: %s", displaytext, err)
-	}
 	if len(fr) == 0 {
 		// Create the private direct connect
 		zonename := d.Get("zone").(string)
@@ -93,7 +100,7 @@ func resourceNetAPIPrivateDirectConnectCreate(d *schema.ResourceData, meta inter
 		gateway := d.Get("gateway").(string)
 
 		// Create a new parameter struct
-		p2 := cs.PrivateDirectConnect.NewCreatePrivateDirectConnectParams(displaytext, zonename, cidr, gateway)
+		p2 := cs.PrivateDirectConnect.NewCreatePrivateDirectConnectParams(displaytext, zonename, cidr, gateway, region)
 		p2.SetDcgname(d.Get("dcg").(string))
 
 		// Create the new private direct connect
@@ -125,7 +132,9 @@ func resourceNetAPIPrivateDirectConnectCreate(d *schema.ResourceData, meta inter
 func resourceNetAPIPrivateDirectConnectRead(d *schema.ResourceData, meta interface{}) error {
 	cs := meta.(*netAPI.NetAPIClient)
 
-	n, count, err := cs.Network.GetNetworkByID(d.Id())
+	region := d.Get("region").(string)
+
+	n, count, err := cs.Network.GetNetworkByID(d.Id(), region)
 	if err != nil {
 		if count == 0 {
 			log.Printf(
@@ -148,8 +157,10 @@ func resourceNetAPIPrivateDirectConnectRead(d *schema.ResourceData, meta interfa
 func resourceNetAPIPrivateDirectConnectUpdate(d *schema.ResourceData, meta interface{}) error {
 	cs := meta.(*netAPI.NetAPIClient)
 
+	region := d.Get("region").(string)
+
 	// Create a new parameter struct
-	p := cs.Network.NewModifyNetworkParams(d.Id())
+	p := cs.Network.NewModifyNetworkParams(d.Id(), region)
 
 	// Check if the name or display text is changed
 	if d.HasChange("display_text") {
