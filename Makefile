@@ -46,7 +46,7 @@ updatedeps:
 		| xargs go list -f '{{join .Deps "\n"}}' \
 		| grep -v github.com/hashicorp/terraform \
 		| sort -u \
-		| xargs go get -f -u -v
+		| xargs go get -v
 
 cover:
 	@go tool cover 2>/dev/null; if [ $$? -eq 3 ]; then \
