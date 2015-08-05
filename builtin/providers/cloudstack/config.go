@@ -5,10 +5,11 @@ import "github.com/benjvi/go-cloudstack/cloudstack43"
 // Config is the configuration structure used to instantiate a
 // new CloudStack client.
 type Config struct {
-	ApiURL    string
-	ApiKey    string
-	SecretKey string
-	Timeout   int64
+	APIURL      string
+	APIKey      string
+	SecretKey   string
+	HTTPGETOnly bool
+	Timeout     int64
 }
 
 // Client() returns a new CloudStack client.

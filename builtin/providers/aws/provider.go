@@ -145,6 +145,13 @@ func Provider() terraform.ResourceProvider {
 					return hashcode.String(v.(string))
 				},
 			},
+
+			"dynamodb_endpoint": &schema.Schema{
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: descriptions["dynamodb_endpoint"],
+			},
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
@@ -176,6 +183,7 @@ func Provider() terraform.ResourceProvider {
 			"aws_iam_group_membership":         resourceAwsIamGroupMembership(),
 			"aws_iam_instance_profile":         resourceAwsIamInstanceProfile(),
 			"aws_iam_policy":                   resourceAwsIamPolicy(),
+			"aws_iam_policy_attachment":        resourceAwsIamPolicyAttachment(),
 			"aws_iam_role_policy":              resourceAwsIamRolePolicy(),
 			"aws_iam_role":                     resourceAwsIamRole(),
 			"aws_iam_server_certificate":       resourceAwsIAMServerCertificate(),
@@ -212,6 +220,7 @@ func Provider() terraform.ResourceProvider {
 			"aws_vpc_dhcp_options":             resourceAwsVpcDhcpOptions(),
 			"aws_vpc_peering_connection":       resourceAwsVpcPeeringConnection(),
 			"aws_vpc":                          resourceAwsVpc(),
+			"aws_vpc_endpoint":                 resourceAwsVpcEndpoint(),
 			"aws_vpn_connection":               resourceAwsVpnConnection(),
 			"aws_vpn_connection_route":         resourceAwsVpnConnectionRoute(),
 			"aws_vpn_gateway":                  resourceAwsVpnGateway(),
@@ -240,16 +249,20 @@ func init() {
 		"max_retries": "The maximum number of times an AWS API request is\n" +
 			"being executed. If the API request still fails, an error is\n" +
 			"thrown.",
+
+		"dynamodb_endpoint": "Use this to override the default endpoint URL constructed from the `region`.\n" +
+			"It's typically used to connect to dynamodb-local.",
 	}
 }
 
 func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	config := Config{
-		AccessKey:  d.Get("access_key").(string),
-		SecretKey:  d.Get("secret_key").(string),
-		Token:      d.Get("token").(string),
-		Region:     d.Get("region").(string),
-		MaxRetries: d.Get("max_retries").(int),
+		AccessKey:        d.Get("access_key").(string),
+		SecretKey:        d.Get("secret_key").(string),
+		Token:            d.Get("token").(string),
+		Region:           d.Get("region").(string),
+		MaxRetries:       d.Get("max_retries").(int),
+		DynamoDBEndpoint: d.Get("dynamodb_endpoint").(string),
 	}
 
 	if v, ok := d.GetOk("allowed_account_ids"); ok {

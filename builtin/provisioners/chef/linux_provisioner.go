@@ -20,7 +20,10 @@ func (p *Provisioner) linuxInstallChefClient(
 	// Build up the command prefix
 	prefix := ""
 	if p.HTTPProxy != "" {
-		prefix += fmt.Sprintf("proxy_http='%s' ", p.HTTPProxy)
+		prefix += fmt.Sprintf("http_proxy='%s' ", p.HTTPProxy)
+	}
+	if p.HTTPSProxy != "" {
+		prefix += fmt.Sprintf("https_proxy='%s' ", p.HTTPSProxy)
 	}
 	if p.NOProxy != nil {
 		prefix += fmt.Sprintf("no_proxy='%s' ", strings.Join(p.NOProxy, ","))
@@ -33,7 +36,7 @@ func (p *Provisioner) linuxInstallChefClient(
 	}
 
 	// Then execute the install.sh scrip to download and install Chef Client
-	err = p.runCommand(o, comm, fmt.Sprintf("%sbash ./install.sh -v %s", prefix, p.Version))
+	err = p.runCommand(o, comm, fmt.Sprintf("%sbash ./install.sh -v %q", prefix, p.Version))
 	if err != nil {
 		return err
 	}
@@ -68,12 +71,29 @@ func (p *Provisioner) linuxCreateConfigFiles(
 			return err
 		}
 
+		// Make sure we have enough rights to upload the hints if using sudo
+		if p.useSudo {
+			if err := p.runCommand(o, comm, "chmod 777 "+hintsDir); err != nil {
+				return err
+			}
+		}
+
 		if err := p.deployOhaiHints(o, comm, hintsDir); err != nil {
 			return err
 		}
+
+		// When done copying the hints restore the rights and make sure root is owner
+		if p.useSudo {
+			if err := p.runCommand(o, comm, "chmod 755 "+hintsDir); err != nil {
+				return err
+			}
+			if err := p.runCommand(o, comm, "chown -R root.root "+hintsDir); err != nil {
+				return err
+			}
+		}
 	}
 
-	// When done copying the files restore the rights and make sure root is owner
+	// When done copying all files restore the rights and make sure root is owner
 	if p.useSudo {
 		if err := p.runCommand(o, comm, "chmod 755 "+linuxConfDir); err != nil {
 			return err

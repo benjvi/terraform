@@ -24,7 +24,7 @@ func TestResourceProvider_linuxInstallChefClient(t *testing.T) {
 
 			Commands: map[string]bool{
 				"sudo curl -LO https://www.chef.io/chef/install.sh": true,
-				"sudo bash ./install.sh -v ":                        true,
+				"sudo bash ./install.sh -v \"\"":                    true,
 				"sudo rm -f install.sh":                             true,
 			},
 		},
@@ -37,11 +37,12 @@ func TestResourceProvider_linuxInstallChefClient(t *testing.T) {
 				"server_url":             "https://chef.local",
 				"validation_client_name": "validator",
 				"validation_key_path":    "validator.pem",
+				"secret_key_path":        "encrypted_data_bag_secret",
 			}),
 
 			Commands: map[string]bool{
 				"curl -LO https://www.chef.io/chef/install.sh": true,
-				"bash ./install.sh -v ":                        true,
+				"bash ./install.sh -v \"\"":                    true,
 				"rm -f install.sh":                             true,
 			},
 		},
@@ -58,13 +59,31 @@ func TestResourceProvider_linuxInstallChefClient(t *testing.T) {
 			}),
 
 			Commands: map[string]bool{
-				"proxy_http='http://proxy.local' curl -LO https://www.chef.io/chef/install.sh": true,
-				"proxy_http='http://proxy.local' bash ./install.sh -v ":                        true,
-				"proxy_http='http://proxy.local' rm -f install.sh":                             true,
+				"http_proxy='http://proxy.local' curl -LO https://www.chef.io/chef/install.sh": true,
+				"http_proxy='http://proxy.local' bash ./install.sh -v \"\"":                    true,
+				"http_proxy='http://proxy.local' rm -f install.sh":                             true,
 			},
 		},
 
-		"NOProxy": {
+		"HTTPSProxy": {
+			Config: testConfig(t, map[string]interface{}{
+				"https_proxy":            "https://proxy.local",
+				"node_name":              "nodename1",
+				"prevent_sudo":           true,
+				"run_list":               []interface{}{"cookbook::recipe"},
+				"server_url":             "https://chef.local",
+				"validation_client_name": "validator",
+				"validation_key_path":    "validator.pem",
+			}),
+
+			Commands: map[string]bool{
+				"https_proxy='https://proxy.local' curl -LO https://www.chef.io/chef/install.sh": true,
+				"https_proxy='https://proxy.local' bash ./install.sh -v \"\"":                    true,
+				"https_proxy='https://proxy.local' rm -f install.sh":                             true,
+			},
+		},
+
+		"NoProxy": {
 			Config: testConfig(t, map[string]interface{}{
 				"http_proxy":             "http://proxy.local",
 				"no_proxy":               []interface{}{"http://local.local", "http://local.org"},
@@ -77,11 +96,11 @@ func TestResourceProvider_linuxInstallChefClient(t *testing.T) {
 			}),
 
 			Commands: map[string]bool{
-				"proxy_http='http://proxy.local' no_proxy='http://local.local,http://local.org' " +
+				"http_proxy='http://proxy.local' no_proxy='http://local.local,http://local.org' " +
 					"curl -LO https://www.chef.io/chef/install.sh": true,
-				"proxy_http='http://proxy.local' no_proxy='http://local.local,http://local.org' " +
-					"bash ./install.sh -v ": true,
-				"proxy_http='http://proxy.local' no_proxy='http://local.local,http://local.org' " +
+				"http_proxy='http://proxy.local' no_proxy='http://local.local,http://local.org' " +
+					"bash ./install.sh -v \"\"": true,
+				"http_proxy='http://proxy.local' no_proxy='http://local.local,http://local.org' " +
 					"rm -f install.sh": true,
 			},
 		},
@@ -99,7 +118,7 @@ func TestResourceProvider_linuxInstallChefClient(t *testing.T) {
 
 			Commands: map[string]bool{
 				"curl -LO https://www.chef.io/chef/install.sh": true,
-				"bash ./install.sh -v 11.18.6":                 true,
+				"bash ./install.sh -v \"11.18.6\"":             true,
 				"rm -f install.sh":                             true,
 			},
 		},
@@ -137,24 +156,29 @@ func TestResourceProvider_linuxCreateConfigFiles(t *testing.T) {
 				"ohai_hints":             []interface{}{"test-fixtures/ohaihint.json"},
 				"node_name":              "nodename1",
 				"run_list":               []interface{}{"cookbook::recipe"},
+				"secret_key_path":        "test-fixtures/encrypted_data_bag_secret",
 				"server_url":             "https://chef.local",
 				"validation_client_name": "validator",
 				"validation_key_path":    "test-fixtures/validator.pem",
 			}),
 
 			Commands: map[string]bool{
-				"sudo mkdir -p " + linuxConfDir:                          true,
-				"sudo chmod 777 " + linuxConfDir:                         true,
-				"sudo mkdir -p " + path.Join(linuxConfDir, "ohai/hints"): true,
-				"sudo chmod 755 " + linuxConfDir:                         true,
-				"sudo chown -R root.root " + linuxConfDir:                true,
+				"sudo mkdir -p " + linuxConfDir:                                    true,
+				"sudo chmod 777 " + linuxConfDir:                                   true,
+				"sudo mkdir -p " + path.Join(linuxConfDir, "ohai/hints"):           true,
+				"sudo chmod 777 " + path.Join(linuxConfDir, "ohai/hints"):          true,
+				"sudo chmod 755 " + path.Join(linuxConfDir, "ohai/hints"):          true,
+				"sudo chown -R root.root " + path.Join(linuxConfDir, "ohai/hints"): true,
+				"sudo chmod 755 " + linuxConfDir:                                   true,
+				"sudo chown -R root.root " + linuxConfDir:                          true,
 			},
 
 			Uploads: map[string]string{
-				linuxConfDir + "/validation.pem":           "VALIDATOR-PEM-FILE",
-				linuxConfDir + "/ohai/hints/ohaihint.json": "OHAI-HINT-FILE",
-				linuxConfDir + "/client.rb":                defaultLinuxClientConf,
-				linuxConfDir + "/first-boot.json":          `{"run_list":["cookbook::recipe"]}`,
+				linuxConfDir + "/client.rb":                 defaultLinuxClientConf,
+				linuxConfDir + "/encrypted_data_bag_secret": "SECRET-KEY-FILE",
+				linuxConfDir + "/first-boot.json":           `{"run_list":["cookbook::recipe"]}`,
+				linuxConfDir + "/ohai/hints/ohaihint.json":  "OHAI-HINT-FILE",
+				linuxConfDir + "/validation.pem":            "VALIDATOR-PEM-FILE",
 			},
 		},
 
@@ -163,6 +187,7 @@ func TestResourceProvider_linuxCreateConfigFiles(t *testing.T) {
 				"node_name":              "nodename1",
 				"prevent_sudo":           true,
 				"run_list":               []interface{}{"cookbook::recipe"},
+				"secret_key_path":        "test-fixtures/encrypted_data_bag_secret",
 				"server_url":             "https://chef.local",
 				"validation_client_name": "validator",
 				"validation_key_path":    "test-fixtures/validator.pem",
@@ -173,9 +198,10 @@ func TestResourceProvider_linuxCreateConfigFiles(t *testing.T) {
 			},
 
 			Uploads: map[string]string{
-				linuxConfDir + "/validation.pem":  "VALIDATOR-PEM-FILE",
-				linuxConfDir + "/client.rb":       defaultLinuxClientConf,
-				linuxConfDir + "/first-boot.json": `{"run_list":["cookbook::recipe"]}`,
+				linuxConfDir + "/client.rb":                 defaultLinuxClientConf,
+				linuxConfDir + "/encrypted_data_bag_secret": "SECRET-KEY-FILE",
+				linuxConfDir + "/first-boot.json":           `{"run_list":["cookbook::recipe"]}`,
+				linuxConfDir + "/validation.pem":            "VALIDATOR-PEM-FILE",
 			},
 		},
 
@@ -187,6 +213,7 @@ func TestResourceProvider_linuxCreateConfigFiles(t *testing.T) {
 				"node_name":              "nodename1",
 				"prevent_sudo":           true,
 				"run_list":               []interface{}{"cookbook::recipe"},
+				"secret_key_path":        "test-fixtures/encrypted_data_bag_secret",
 				"server_url":             "https://chef.local",
 				"validation_client_name": "validator",
 				"validation_key_path":    "test-fixtures/validator.pem",
@@ -197,9 +224,10 @@ func TestResourceProvider_linuxCreateConfigFiles(t *testing.T) {
 			},
 
 			Uploads: map[string]string{
-				linuxConfDir + "/validation.pem":  "VALIDATOR-PEM-FILE",
-				linuxConfDir + "/client.rb":       proxyLinuxClientConf,
-				linuxConfDir + "/first-boot.json": `{"run_list":["cookbook::recipe"]}`,
+				linuxConfDir + "/client.rb":                 proxyLinuxClientConf,
+				linuxConfDir + "/encrypted_data_bag_secret": "SECRET-KEY-FILE",
+				linuxConfDir + "/first-boot.json":           `{"run_list":["cookbook::recipe"]}`,
+				linuxConfDir + "/validation.pem":            "VALIDATOR-PEM-FILE",
 			},
 		},
 
@@ -229,6 +257,7 @@ func TestResourceProvider_linuxCreateConfigFiles(t *testing.T) {
 				"node_name":              "nodename1",
 				"prevent_sudo":           true,
 				"run_list":               []interface{}{"cookbook::recipe"},
+				"secret_key_path":        "test-fixtures/encrypted_data_bag_secret",
 				"server_url":             "https://chef.local",
 				"validation_client_name": "validator",
 				"validation_key_path":    "test-fixtures/validator.pem",
@@ -239,8 +268,9 @@ func TestResourceProvider_linuxCreateConfigFiles(t *testing.T) {
 			},
 
 			Uploads: map[string]string{
-				linuxConfDir + "/validation.pem": "VALIDATOR-PEM-FILE",
-				linuxConfDir + "/client.rb":      defaultLinuxClientConf,
+				linuxConfDir + "/client.rb":                 defaultLinuxClientConf,
+				linuxConfDir + "/encrypted_data_bag_secret": "SECRET-KEY-FILE",
+				linuxConfDir + "/validation.pem":            "VALIDATOR-PEM-FILE",
 				linuxConfDir + "/first-boot.json": `{"key1":{"subkey1":{"subkey2a":["val1","val2","val3"],` +
 					`"subkey2b":{"subkey3":"value3"}}},"key2":"value2","run_list":["cookbook::recipe"]}`,
 			},
