@@ -14,7 +14,7 @@ type Config struct {
 
 // Client() returns a new CloudStack client.
 func (c *Config) NewClient() (*cloudstack43.CloudStackClient, error) {
-	cs := cloudstack43.NewAsyncClient(c.ApiURL, c.ApiKey, c.SecretKey, false)
+	cs := cloudstack43.NewAsyncClient(c.APIURL, c.APIKey, c.SecretKey, false)
 	cs.AsyncTimeout(c.Timeout)
 	return cs, nil
 }

@@ -162,7 +162,7 @@ func resourceCloudStackNetworkACLRuleCreateRule(
 			return err
 		}
 
-		uuids["icmp"] = r.(*cloudstack.CreateNetworkACLResponse).Id
+		uuids["icmp"] = r.Id
 		rule["uuids"] = uuids
 	}
 
@@ -173,7 +173,7 @@ func resourceCloudStackNetworkACLRuleCreateRule(
 			return err
 		}
 
-		uuids["all"] = r.(*cloudstack.CreateNetworkACLResponse).Id
+		uuids["all"] = r.Id
 		rule["uuids"] = uuids
 	}
 
@@ -216,7 +216,7 @@ func resourceCloudStackNetworkACLRuleCreateRule(
 				ports.Add(port)
 				rule["ports"] = ports
 
-				uuids[port.(string)] = r.(*cloudstack.CreateNetworkACLResponse).Id
+				uuids[port.(string)] = r.Id
 				rule["uuids"] = uuids
 			}
 		}
@@ -597,10 +597,10 @@ func verifyNetworkACLRuleParams(d *schema.ResourceData, rule map[string]interfac
 }
 
 func retryableACLCreationFunc(
-	cs *cloudstack.CloudStackClient,
-	p *cloudstack.CreateNetworkACLParams) func() (interface{}, error) {
+	cs *cloudstack43.CloudStackClient,
+	p *cloudstack43.CreateNetworkACLParams) func() (interface{}, error) {
 	return func() (interface{}, error) {
-		r, err := cs.NetworkACL.CreateNetworkACL(p)
+		r, err := cs.NetworkACL.CreateNetworkACL(p, true)
 		if err != nil {
 			return nil, err
 		}

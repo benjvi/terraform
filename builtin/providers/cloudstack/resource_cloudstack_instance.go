@@ -213,7 +213,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		if len(ud) > 32768 {
 			return fmt.Errorf(
 				"The supplied user_data contains %d bytes after encoding, "+
-					"this exeeds the limit of %d bytes", len(ud), maxUD)
+					"this exeeds the limit of %d bytes", len(ud), 32768)
 		}
 
 		p.SetUserdata(ud)

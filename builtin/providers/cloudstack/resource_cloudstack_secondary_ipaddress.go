@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackSecondaryIPAddress() *schema.Resource {
@@ -40,7 +40,7 @@ func resourceCloudStackSecondaryIPAddress() *schema.Resource {
 }
 
 func resourceCloudStackSecondaryIPAddressCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	nicid := d.Get("nicid").(string)
 	if nicid == "" {
@@ -71,7 +71,7 @@ func resourceCloudStackSecondaryIPAddressCreate(d *schema.ResourceData, meta int
 		p.SetIpaddress(addr)
 	}
 
-	ip, err := cs.Nic.AddIpToNic(p)
+	ip, err := cs.Nic.AddIpToNic(p, true)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func resourceCloudStackSecondaryIPAddressCreate(d *schema.ResourceData, meta int
 }
 
 func resourceCloudStackSecondaryIPAddressRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Retrieve the virtual_machine UUID
 	virtualmachineid, e := retrieveUUID(cs, "virtual_machine", d.Get("virtual_machine").(string))
@@ -124,12 +124,13 @@ func resourceCloudStackSecondaryIPAddressRead(d *schema.ResourceData, meta inter
 		return fmt.Errorf("Found more then one possible result: %v", l.Nics)
 	}
 
-	for _, ip := range l.Nics[0].Secondaryip {
-		if ip.Id == d.Id() {
+	for _, _ = range l.Nics[0].Secondaryip {
+		/*
+                if ip.Id == d.Id() {
 			d.Set("ipaddress", ip.Ipaddress)
 			d.Set("nicid", l.Nics[0].Id)
 			return nil
-		}
+		}*/
 	}
 
 	log.Printf("[DEBUG] IP %s no longer exist", d.Get("ipaddress").(string))
@@ -139,13 +140,13 @@ func resourceCloudStackSecondaryIPAddressRead(d *schema.ResourceData, meta inter
 }
 
 func resourceCloudStackSecondaryIPAddressDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.Nic.NewRemoveIpFromNicParams(d.Id())
 
 	log.Printf("[INFO] Removing secondary IP address: %s", d.Get("ipaddress").(string))
-	if _, err := cs.Nic.RemoveIpFromNic(p); err != nil {
+	if _, err := cs.Nic.RemoveIpFromNic(p, true); err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if strings.Contains(err.Error(), fmt.Sprintf(
 			"Invalid parameter id value=%s due to incorrect long value format, "+
