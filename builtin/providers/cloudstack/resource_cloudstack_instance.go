@@ -51,22 +51,16 @@ func resourceCloudStackInstance() *schema.Resource {
 				ForceNew: true,
 			},
 
-			"extra_networks": &schema.Schema{
-				Type:     schema.TypeSet,
+			"second_network": &schema.Schema{
+				Type:     schema.TypeString,
 				Optional: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"networkid": &schema.Schema{
-							Type:     schema.TypeString,
-							Required: true,
-						},
-						"ipaddress": &schema.Schema{
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
-				Set: resourceCloudStackInstanceExtraNicHash,
+				ForceNew: true,
+			},
+
+			"second_ipaddress": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+				ForceNew: true,
 			},
 
 			"template": &schema.Schema{
@@ -166,20 +160,11 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		}
 		networkSlice = append(networkSlice, networkid)
 
-		if extranics, ok := d.GetOk("extra_networks"); ok {
-			extranetworks := extranics.(*schema.Set)
-			if extranetworks.Len() > 0 {
-				for _, nic := range extranetworks.List() {
-					m := nic.(map[string]interface{})
-
-					networkid, e = retrieveUUID(cs, "network", m["networkid"].(string))
-					if e != nil {
-						return e.Error()
-					}
-					networkSlice = append(networkSlice, networkid)
-				}
-			}
+		networkid, e = retrieveUUID(cs, "second_network", d.Get("second_network").(string))
+		if e != nil {
+			return e.Error()
 		}
+		networkSlice = append(networkSlice, networkid)
 		// Set the default network ID
 		p.SetNetworkids(networkSlice)
 	}
@@ -268,17 +253,8 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	setValueOrUUID(d, "network", vm.Nic[0].Networkname, vm.Nic[0].Networkid)
 
 	if len(vm.Nic)>1 {
-		extranetworks := &schema.Set{
-			F: resourceCloudStackInstanceExtraNicHash,
-		}
-		for i := 1; i < len(vm.Nic); i++ {
-			// TODO: must set valueorUUID here, depending on what the user gave 
-			extranetwork := make(map[string]interface{})
-                        extranetwork["networkid"] = vm.Nic[i].Networkid
-                        extranetwork["ipaddress"] = vm.Nic[i].Ipaddress
-			extranetworks.Add(extranetwork)
-		}
-		d.Set("extra_networks", extranetworks)
+		setValueOrUUID(d, "second_network", vm.Nic[1].Networkname, vm.Nic[1].Networkid)
+		d.Set("second_ipaddress", vm.Nic[1].Ipaddress)
 	}
 
 	setValueOrUUID(d, "service_offering", vm.Serviceofferingname, vm.Serviceofferingid)
