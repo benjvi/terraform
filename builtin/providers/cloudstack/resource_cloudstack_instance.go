@@ -55,7 +55,7 @@ func resourceCloudStackInstance() *schema.Resource {
 				Optional: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"network": &schema.Schema{
+						"networkid": &schema.Schema{
 							Type:     schema.TypeString,
 							Required: true,
 						},
@@ -170,7 +170,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 				for _, nic := range extranetworks.List() {
 					m := nic.(map[string]interface{})
 
-					networkid, e = retrieveUUID(cs, "network", m["network"].(string))
+					networkid, e = retrieveUUID(cs, "network", m["networkid"].(string))
 					if e != nil {
 						return e.Error()
 					}
@@ -273,7 +273,7 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 		for i := 1; i < len(vm.Nic); i++ {
 			// TODO: must set valueorUUID here, depending on what the user gave 
 			extranetwork := make(map[string]interface{})
-                        extranetwork["network"] = vm.Nic[i].Networkid
+                        extranetwork["networkid"] = vm.Nic[i].Networkid
                         extranetwork["ipaddress"] = vm.Nic[i].Ipaddress
 			extranetworks.Add(extranetwork)
 		}
