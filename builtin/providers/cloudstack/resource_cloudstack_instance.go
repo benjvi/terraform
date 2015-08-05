@@ -177,7 +177,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		}
 		networkSlice = append(networkSlice, networkid)
 
-		networkid, e = retrieveUUID(cs, "second_network", d.Get("second_network").(string))
+		networkid, e = retrieveUUID(cs, "network", d.Get("second_network").(string))
 		if e != nil {
 			return e.Error()
 		}
