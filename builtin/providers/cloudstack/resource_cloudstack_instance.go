@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"hash/fnv"
 
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/xanzy/go-cloudstack/cloudstack"
@@ -48,6 +49,24 @@ func resourceCloudStackInstance() *schema.Resource {
 				Optional: true,
 				Computed: true,
 				ForceNew: true,
+			},
+
+			"extra_networks": &schema.Schema{
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"network": &schema.Schema{
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"ipaddress": &schema.Schema{
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+					},
+				},
+				Set: resourceCloudStackInstanceExtraNicHash,
 			},
 
 			"template": &schema.Schema{
@@ -139,13 +158,30 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	}
 
 	if zone.Networktype == "Advanced" {
+		networkSlice := []string{}
 		// Retrieve the network UUID
 		networkid, e := retrieveUUID(cs, "network", d.Get("network").(string))
 		if e != nil {
 			return e.Error()
 		}
+		networkSlice = append(networkSlice, networkid)
+
+		if extranics, ok := d.GetOk("extra_networks"); ok {
+			extranetworks := extranics.(*schema.Set)
+			if extranetworks.Len() > 0 {
+				for _, nic := range extranetworks.List() {
+					m := nic.(map[string]interface{})
+
+					networkid, e = retrieveUUID(cs, "network", m["network"].(string))
+					if e != nil {
+						return e.Error()
+					}
+					networkSlice = append(networkSlice, networkid)
+				}
+			}
+		}
 		// Set the default network ID
-		p.SetNetworkids([]string{networkid})
+		p.SetNetworkids(networkSlice)
 	}
 
 	// If there is a ipaddres supplied, add it to the parameter struct
@@ -230,6 +266,21 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	//NB cloudstack sometimes sends back the wrong keypair name, so dont update it
 
 	setValueOrUUID(d, "network", vm.Nic[0].Networkname, vm.Nic[0].Networkid)
+
+	if len(vm.Nic)>1 {
+		extranetworks := &schema.Set{
+			F: resourceCloudStackInstanceExtraNicHash,
+		}
+		for i := 1; i < len(vm.Nic); i++ {
+			// TODO: must set valueorUUID here, depending on what the user gave 
+			extranetwork := make(map[string]interface{})
+                        extranetwork["network"] = vm.Nic[i].Networkid
+                        extranetwork["ipaddress"] = vm.Nic[i].Ipaddress
+			extranetworks.Add(extranetwork)
+		}
+		d.Set("extra_networks", extranetworks)
+	}
+
 	setValueOrUUID(d, "service_offering", vm.Serviceofferingname, vm.Serviceofferingid)
 	setValueOrUUID(d, "template", vm.Templatename, vm.Templateid)
 	setValueOrUUID(d, "project", vm.Project, vm.Projectid)
@@ -346,4 +397,15 @@ func resourceCloudStackInstanceDelete(d *schema.ResourceData, meta interface{}) 
 	}
 
 	return nil
+}
+
+func resourceCloudStackInstanceExtraNicHash(v interface{}) int {
+	m := v.(map[string]interface{})
+	return hash(m["network"].(string))
+}
+
+func hash(s string) int {
+        h := fnv.New32a()
+        h.Write([]byte(s))
+        return int(h.Sum32())
 }
