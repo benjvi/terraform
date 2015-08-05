@@ -437,7 +437,7 @@ func resourceCloudStackInstanceDelete(d *schema.ResourceData, meta interface{}) 
 
 func resourceCloudStackInstanceExtraNicHash(v interface{}) int {
 	m := v.(map[string]interface{})
-	return hash(m["network"].(string))
+	return hash(m["networkid"].(string))
 }
 
 func hash(s string) int {
