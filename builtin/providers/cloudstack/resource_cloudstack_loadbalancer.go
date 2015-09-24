@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackLoadBalancerRule() *schema.Resource {
@@ -68,7 +68,7 @@ func resourceCloudStackLoadBalancerRule() *schema.Resource {
 }
 
 func resourceCloudStackLoadBalancerRuleCreate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 	d.Partial(true)
 
 	// Create a new parameter struct
@@ -108,7 +108,7 @@ func resourceCloudStackLoadBalancerRuleCreate(d *schema.ResourceData, meta inter
 	p.SetPublicipid(ipaddressid)
 
 	// Create the load balancer rule
-	r, err := cs.LoadBalancer.CreateLoadBalancerRule(p)
+	r, err := cs.LoadBalancer.CreateLoadBalancerRule(p, true)
 	if err != nil {
 		return err
 	}
@@ -123,17 +123,15 @@ func resourceCloudStackLoadBalancerRuleCreate(d *schema.ResourceData, meta inter
 	d.SetPartial("private_port")
 	d.SetPartial("public_port")
 
-	// Create a new parameter struct
-	ap := cs.LoadBalancer.NewAssignToLoadBalancerRuleParams(r.Id)
-
 	var mbs []string
 	for _, id := range d.Get("members").([]interface{}) {
 		mbs = append(mbs, id.(string))
 	}
 
-	ap.SetVirtualmachineids(mbs)
+	// Create a new parameter struct
+	ap := cs.LoadBalancer.NewAssignToLoadBalancerRuleParams(r.Id, mbs)
 
-	_, err = cs.LoadBalancer.AssignToLoadBalancerRule(ap)
+	_, err = cs.LoadBalancer.AssignToLoadBalancerRule(ap, true)
 	if err != nil {
 		return err
 	}
@@ -145,7 +143,7 @@ func resourceCloudStackLoadBalancerRuleCreate(d *schema.ResourceData, meta inter
 }
 
 func resourceCloudStackLoadBalancerRuleRead(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Get the load balancer details
 	lb, count, err := cs.LoadBalancer.GetLoadBalancerRuleByID(d.Id())
@@ -178,7 +176,7 @@ func resourceCloudStackLoadBalancerRuleRead(d *schema.ResourceData, meta interfa
 }
 
 func resourceCloudStackLoadBalancerRuleUpdate(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	if d.HasChange("name") || d.HasChange("description") || d.HasChange("algorithm") {
 		name := d.Get("name").(string)
@@ -212,7 +210,7 @@ func resourceCloudStackLoadBalancerRuleUpdate(d *schema.ResourceData, meta inter
 			p.SetAlgorithm(algorithm)
 		}
 
-		_, err := cs.LoadBalancer.UpdateLoadBalancerRule(p)
+		_, err := cs.LoadBalancer.UpdateLoadBalancerRule(p, true)
 		if err != nil {
 			return fmt.Errorf(
 				"Error updating load balancer rule %s", name)
@@ -222,13 +220,13 @@ func resourceCloudStackLoadBalancerRuleUpdate(d *schema.ResourceData, meta inter
 }
 
 func resourceCloudStackLoadBalancerRuleDelete(d *schema.ResourceData, meta interface{}) error {
-	cs := meta.(*cloudstack.CloudStackClient)
+	cs := meta.(*cloudstack43.CloudStackClient)
 
 	// Create a new parameter struct
 	p := cs.LoadBalancer.NewDeleteLoadBalancerRuleParams(d.Id())
 
 	log.Printf("[INFO] Deleting load balancer rule: %s", d.Get("name").(string))
-	if _, err := cs.LoadBalancer.DeleteLoadBalancerRule(p); err != nil {
+	if _, err := cs.LoadBalancer.DeleteLoadBalancerRule(p, true); err != nil {
 		// This is a very poor way to be told the UUID does no longer exist :(
 		if !strings.Contains(err.Error(), fmt.Sprintf(
 			"Invalid parameter id value=%s due to incorrect long value format, "+

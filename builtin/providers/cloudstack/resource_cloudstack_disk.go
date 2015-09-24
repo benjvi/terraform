@@ -326,7 +326,7 @@ func resourceCloudStackDiskAttach(d *schema.ResourceData, meta interface{}) erro
 		return err
 	}
 
-	d.SetId(r.(*cloudstack.AttachVolumeResponse).Id)
+	d.SetId(r.(*cloudstack43.AttachVolumeResponse).Id)
 
 	return nil
 }
@@ -389,8 +389,8 @@ func isAttached(cs *cloudstack43.CloudStackClient, id string) (bool, error) {
 }
 
 func retryableAttachVolumeFunc(
-	cs *cloudstack.CloudStackClient,
-	p *cloudstack.AttachVolumeParams) func() (interface{}, error) {
+	cs *cloudstack43.CloudStackClient,
+	p *cloudstack43.AttachVolumeParams) func() (interface{}, error) {
 	return func() (interface{}, error) {
 		r, err := cs.Volume.AttachVolume(p, true)
 		if err != nil {
