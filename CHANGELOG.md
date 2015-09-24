@@ -1,10 +1,45 @@
 ## 0.6.4 (unreleased)
 
+FEATURES:
+
+  * **New provider: `rundeck`** [GH-2412]
+  * **New resource: `cloudstack_loadbalancer_rule`** [GH-2934]
+  * **New resource: `google_compute_project_metadata`** [GH-3065]
+  * **New resources: `aws_ami`, `aws_ami_copy`, `aws_ami_from_instance`** [GH-2874]
+  * **New resource: `google_storage_bucket_object`** [GH-3192]
+  * **New resources: `google_compute_vpn_gateway`, `google_compute_vpn_tunnel`** [GH-3213]
+
 IMPROVEMENTS:
 
   * core: Add a function to find the index of an element in a list. [GH-2704]
   * core: Print all outputs when `terraform output` is called with no arguments [GH-2920]
+  * core: In plan output summary, count resource replacement as Add/Remove instead of Change [GH-3173]
   * provider/aws: Add `instance_initiated_shutdown_behavior` to AWS Instance [GH-2887]
+  * provider/aws: Support IAM role names (previously just ARNs) in `aws_ecs_service.iam_role` [GH-3061]
+  * provider/aws: Add update method to RDS Subnet groups, can modify subnets without recreating  [GH-3053]
+  * provider/aws: Paginate notifications returned for ASG Notifications [GH-3043]
+  * provider/aws: add `ses_smtp_password` to `aws_iam_access_key` [GH-3165]
+  * provider/aws: read `iam_instance_profile` for `aws_instance` and save to state [GH-3167]
+  * provider/aws: Add `versioning` option to `aws_s3_bucket` [GH-2942]
+  * provider/aws: Add `configuation_endpoint` to `aws_elasticache_cluster` [GH-3250]
+  * provider/cloudstack: Add `project` parameter to `cloudstack_vpc`, `cloudstack_network`, `cloudstack_ipaddress` and `cloudstack_disk` [GH-3035]
+
+BUG FIXES:
+
+  * core: Fix problems referencing list attributes in interpolations [GH-2157]
+  * provider/google: Crashes with interface conversion in GCE Instance Template [GH-3027]
+  * provider/google: Convert int to int64 when building the GKE cluster.NodeConfig struct [GH-2978]
+  * provider/aws: Retry creation of `aws_ecs_service` if IAM policy isn't ready yet [GH-3061]
+  * provider/aws: Fix issue with mixed capitalization for RDS Instances  [GH-3053]
+  * provider/aws: Fix issue with RDS to allow major version upgrades [GH-3053]
+  * provider/aws: Fix shard_count in `aws_kinesis_stream` [GH-2986]
+  * provider/aws: Fix issue with `key_name` and using VPCs with spot instance requests [GH-2954]
+  * provider/aws: Fix unresolvable diffs coming from `aws_elasticache_cluster` names being downcased
+      by AWS [GH-3120]
+  * provider/aws: Read instance source_dest_check and save to state [GH-3152]
+  * provider/aws: Allow `weight = 0` in Route53 records [GH-3196]
+  * provider/openstack: add state 'downloading' to list of expected states in
+      `blockstorage_volume_v1` creation [GH-2866]
 
 ## 0.6.3 (August 11, 2015)
 
@@ -36,6 +71,7 @@ IMPROVEMENTS:
   * provider/aws: Allow configuration of the DynamoDB Endpoint [GH-2825]
   * provider/aws: Compute private ip addresses of ENIs if they are not specified [GH-2743]
   * provider/aws: Add `arn` attribute for DynamoDB tables [GH-2924]
+  * provider/aws: Fail silently when account validation fails while from instance profile [GH-3001]
   * provider/azure: Allow `settings_file` to accept XML string [GH-2922]
   * provider/azure: Provide a simpler error when using a Platform Image without a
       Storage Service [GH-2861]
