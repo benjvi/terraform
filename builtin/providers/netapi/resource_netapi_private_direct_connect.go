@@ -3,6 +3,7 @@ package netapi
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/benjvi/go-net-api"
 	"github.com/hashicorp/terraform/helper/schema"
@@ -68,6 +69,17 @@ func resourceNetAPIPrivateDirectConnect() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+
+			"is_ready": &schema.Schema{
+				Type:     schema.TypeBool,
+				Computed: true,
+			},
+
+			"is_ready_timeout": &schema.Schema{
+				Type:     schema.TypeInt,
+				Optional: true,
+				Default:  600,
+			},
 		},
 	}
 }
@@ -126,6 +138,29 @@ func resourceNetAPIPrivateDirectConnectCreate(d *schema.ResourceData, meta inter
 	} else {
 		return fmt.Errorf("You have multiple private direct connects with the same identifier (%s)", displaytext)
 	}
+
+	// Wait until the template is ready to use, or timeout with an error...
+	currentTime := time.Now().Unix()
+	timeout := int64(d.Get("is_ready_timeout").(int))
+	for {
+		// Start with the sleep so the register action has a few seconds
+		// to process the registration correctly. Without this wait
+		time.Sleep(10 * time.Second)
+
+		err := resourceNetAPIPrivateDirectConnectRead(d, meta)
+		if err != nil {
+			return err
+		}
+
+		if d.Get("is_ready").(bool) {
+			return nil
+		}
+
+		if time.Now().Unix()-currentTime > timeout {
+			return fmt.Errorf("Timeout while waiting for template to become ready")
+		}
+	}
+
 	return resourceNetAPIPrivateDirectConnectRead(d, meta)
 }
 
@@ -150,7 +185,7 @@ func resourceNetAPIPrivateDirectConnectRead(d *schema.ResourceData, meta interfa
 	d.Set("cidr", n.Cidr)
 	d.Set("dcg", n.Dcgfriendlyname)
 	d.Set("gateway", n.Gateway)
-
+	d.Set("is_ready", n.Isprovisioned)
 	return nil
 }
 
