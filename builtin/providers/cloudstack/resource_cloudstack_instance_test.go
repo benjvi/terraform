@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackInstance_basic(t *testing.T) {
@@ -67,38 +67,37 @@ func TestAccCloudStackInstance_update(t *testing.T) {
 }
 
 func TestAccCloudStackInstance_downsize(t *testing.T) {
-        var instance cloudstack.VirtualMachine
+	var instance cloudstack.VirtualMachine
 
-        resource.Test(t, resource.TestCase{
-                PreCheck:     func() { testAccPreCheck(t) },
-                Providers:    testAccProviders,
-                CheckDestroy: testAccCheckCloudStackInstanceDestroy,
-                Steps: []resource.TestStep{
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackInstanceDestroy,
+		Steps: []resource.TestStep{
 
-                        resource.TestStep{
-                                Config: testAccCloudStackInstance_renameResizeAndAddNetwork,
-                                Check: resource.ComposeTestCheckFunc(
-                                        testAccCheckCloudStackInstanceExists(
-                                                "cloudstack_instance.foobar", &instance),
-                                        testAccCheckCloudStackInstanceRenamedResizedAndNetworkAdded(&instance),
-                                        resource.TestCheckResourceAttr(
-                                                "cloudstack_instance.foobar", "display_name", "terraform-updated"),
-                                        resource.TestCheckResourceAttr(
-                                                "cloudstack_instance.foobar", "service_offering", CLOUDSTACK_SERVICE_OFFERING_2),
-                                ),
-                        },
+			resource.TestStep{
+				Config: testAccCloudStackInstance_renameResizeAndAddNetwork,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCloudStackInstanceExists(
+						"cloudstack_instance.foobar", &instance),
+					testAccCheckCloudStackInstanceRenamedResizedAndNetworkAdded(&instance),
+					resource.TestCheckResourceAttr(
+						"cloudstack_instance.foobar", "display_name", "terraform-updated"),
+					resource.TestCheckResourceAttr(
+						"cloudstack_instance.foobar", "service_offering", CLOUDSTACK_SERVICE_OFFERING_2),
+				),
+			},
 
-                        resource.TestStep{
-                                Config: testAccCloudStackInstance_basic,
-                                Check: resource.ComposeTestCheckFunc(
-                                        testAccCheckCloudStackInstanceExists(
-                                                "cloudstack_instance.foobar", &instance),
-                                        testAccCheckCloudStackInstanceAttributes(&instance),
-                                ),
-                        },
-
-                },
-        })
+			resource.TestStep{
+				Config: testAccCloudStackInstance_basic,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCloudStackInstanceExists(
+						"cloudstack_instance.foobar", &instance),
+					testAccCheckCloudStackInstanceAttributes(&instance),
+				),
+			},
+		},
+	})
 }
 
 func TestAccCloudStackInstance_fixedIP(t *testing.T) {
@@ -234,8 +233,8 @@ func testAccCheckCloudStackInstanceRenamedResizedAndNetworkAdded(
 		}
 
 		if instance.Nic[1].Networkname != CLOUDSTACK_NETWORK_2 {
-                        return fmt.Errorf("Bad network: %s", instance.Nic[1].Networkname)
-                }
+			return fmt.Errorf("Bad network: %s", instance.Nic[1].Networkname)
+		}
 
 		return nil
 	}

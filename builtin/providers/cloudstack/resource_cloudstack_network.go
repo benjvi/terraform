@@ -6,8 +6,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/hashicorp/terraform/helper/schema"
 )
 
 func resourceCloudStackNetwork() *schema.Resource {

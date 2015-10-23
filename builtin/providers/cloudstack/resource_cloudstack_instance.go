@@ -5,12 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"strings"
-	"hash/fnv"
 
-	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/hashicorp/terraform/helper/schema"
 )
 
 func resourceCloudStackInstance() *schema.Resource {
@@ -177,12 +177,13 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		}
 		networkSlice = append(networkSlice, networkid)
 
-		networkid, e = retrieveUUID(cs, "network", d.Get("second_network").(string))
-		if e != nil {
-			return e.Error()
+		if secondnetwork, ok := d.GetOk("second_network"); ok {
+			networkid, e = retrieveUUID(cs, "network", secondnetwork.(string))
+			if e != nil {
+				return e.Error()
+			}
+			networkSlice = append(networkSlice, networkid)
 		}
-		networkSlice = append(networkSlice, networkid)
-
 		// Set the default network ID
 		p.SetNetworkids(networkSlice)
 	}
@@ -231,13 +232,13 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	}
 	d.SetId(r.Id)
 	d.SetPartial("id")
-	d.SetPartial("expunge")	
+	d.SetPartial("expunge")
 
 	// Wait until the operation finished
 	r, err = cs.VirtualMachine.WaitForDeployVirtualMachine(r.JobID)
 	if err != nil {
-                return fmt.Errorf("Error creating the new instance %s: %s", name, err)
-        }
+		return fmt.Errorf("Error creating the new instance %s: %s", name, err)
+	}
 
 	// Set the connection info for any configured provisioners
 	d.SetConnInfo(map[string]string{
@@ -272,7 +273,7 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 
 	setValueOrUUID(d, "network", vm.Nic[0].Networkname, vm.Nic[0].Networkid)
 
-	if len(vm.Nic)>1 {
+	if len(vm.Nic) > 1 {
 		setValueOrUUID(d, "second_network", vm.Nic[1].Networkname, vm.Nic[1].Networkid)
 		d.Set("second_ipaddress", vm.Nic[1].Ipaddress)
 	}
@@ -378,29 +379,29 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 			log.Printf("[DEBUG] User data  changed for %s, starting update", name)
 
 			// Create a new parameter struct
-		        p := cs.VirtualMachine.NewUpdateVirtualMachineParams(d.Id())
+			p := cs.VirtualMachine.NewUpdateVirtualMachineParams(d.Id())
 			p.SetUserdata(ud)
 
 			// Before we can actually change the service offering, the virtual machine must be stopped
 			_, err := cs.VirtualMachine.StopVirtualMachine(cs.VirtualMachine.NewStopVirtualMachineParams(d.Id()), true)
-	                if err != nil {
-		                return fmt.Errorf(
-	                                "Error stopping instance %s before changing user data: %s", name, err)
-		        }
-	               // Change the service offering
-		        _, err = cs.VirtualMachine.UpdateVirtualMachine(p)
+			if err != nil {
+				return fmt.Errorf(
+					"Error stopping instance %s before changing user data: %s", name, err)
+			}
+			// Change the service offering
+			_, err = cs.VirtualMachine.UpdateVirtualMachine(p)
 			if err != nil {
 				return fmt.Errorf(
 					"Error changing the user data for instance %s: %s", name, err)
-	                }
-		        // Start the virtual machine again
+			}
+			// Start the virtual machine again
 			_, err = cs.VirtualMachine.StartVirtualMachine(cs.VirtualMachine.NewStartVirtualMachineParams(d.Id()), true)
-	                if err != nil {
-		                return fmt.Errorf(
-			                "Error starting instance %s after changing user data: %s", name, err)
-	                }
+			if err != nil {
+				return fmt.Errorf(
+					"Error starting instance %s after changing user data: %s", name, err)
+			}
 
-		        d.SetPartial("user_data")
+			d.SetPartial("user_data")
 		}
 	}
 
@@ -439,7 +440,7 @@ func resourceCloudStackInstanceExtraNicHash(v interface{}) int {
 }
 
 func hash(s string) int {
-        h := fnv.New32a()
-        h.Write([]byte(s))
-        return int(h.Sum32())
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return int(h.Sum32())
 }

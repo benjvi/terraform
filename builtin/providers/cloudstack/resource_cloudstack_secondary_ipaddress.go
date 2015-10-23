@@ -5,8 +5,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/hashicorp/terraform/helper/schema"
 )
 
 func resourceCloudStackSecondaryIPAddress() *schema.Resource {
@@ -126,11 +126,11 @@ func resourceCloudStackSecondaryIPAddressRead(d *schema.ResourceData, meta inter
 
 	for _, _ = range l.Nics[0].Secondaryip {
 		/*
-                if ip.Id == d.Id() {
-			d.Set("ipaddress", ip.Ipaddress)
-			d.Set("nicid", l.Nics[0].Id)
-			return nil
-		}*/
+		                if ip.Id == d.Id() {
+					d.Set("ipaddress", ip.Ipaddress)
+					d.Set("nicid", l.Nics[0].Id)
+					return nil
+				}*/
 	}
 
 	log.Printf("[DEBUG] IP %s no longer exist", d.Get("ipaddress").(string))

@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/hashicorp/terraform/helper/schema"
 )
 
 type retrieveError struct {

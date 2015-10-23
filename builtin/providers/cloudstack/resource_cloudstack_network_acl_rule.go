@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func resourceCloudStackNetworkACLRule() *schema.Resource {

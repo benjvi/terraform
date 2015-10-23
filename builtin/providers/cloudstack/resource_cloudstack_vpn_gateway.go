@@ -5,8 +5,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/benjvi/go-cloudstack/cloudstack43"
+	"github.com/hashicorp/terraform/helper/schema"
 )
 
 func resourceCloudStackVPNGateway() *schema.Resource {
