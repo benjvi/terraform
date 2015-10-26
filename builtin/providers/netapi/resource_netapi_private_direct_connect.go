@@ -139,12 +139,12 @@ func resourceNetAPIPrivateDirectConnectCreate(d *schema.ResourceData, meta inter
 		return fmt.Errorf("You have multiple private direct connects with the same identifier (%s)", displaytext)
 	}
 
-	// Wait until the template is ready to use, or timeout with an error...
+	// Wait until the direct connect is ready to use, or timeout with an error...
 	currentTime := time.Now().Unix()
 	timeout := int64(d.Get("is_ready_timeout").(int))
 	for {
-		// Start with the sleep so the register action has a few seconds
-		// to process the registration correctly. Without this wait
+		// Start with the sleep so the provision action has a few seconds
+		// to be processed correctly
 		time.Sleep(10 * time.Second)
 
 		err := resourceNetAPIPrivateDirectConnectRead(d, meta)
@@ -157,7 +157,7 @@ func resourceNetAPIPrivateDirectConnectCreate(d *schema.ResourceData, meta inter
 		}
 
 		if time.Now().Unix()-currentTime > timeout {
-			return fmt.Errorf("Timeout while waiting for template to become ready")
+			return fmt.Errorf("Timeout while waiting for private direct connect to become ready")
 		}
 	}
 
@@ -192,6 +192,10 @@ func resourceNetAPIPrivateDirectConnectRead(d *schema.ResourceData, meta interfa
 func resourceNetAPIPrivateDirectConnectUpdate(d *schema.ResourceData, meta interface{}) error {
 	cs := meta.(*netAPI.NetAPIClient)
 
+	if !d.Get("is_ready").(bool) {
+		return fmt.Errorf("Private direct connect is not ready, cannot perform any updates")
+	}
+
 	region := d.Get("region").(string)
 
 	// Create a new parameter struct
@@ -223,6 +227,28 @@ func resourceNetAPIPrivateDirectConnectUpdate(d *schema.ResourceData, meta inter
 	//Some changes will cause resource to be created
 	if r.ListNetworks[0].Id != "" {
 		d.SetId(r.ListNetworks[0].Id)
+	}
+
+	// Update can make the network not ready, must wait again
+	currentTime := time.Now().Unix()
+	timeout := int64(d.Get("is_ready_timeout").(int))
+	for {
+		// Start with the sleep so the provision action has a few seconds
+		// to be processed correctly
+		time.Sleep(10 * time.Second)
+
+		err := resourceNetAPIPrivateDirectConnectRead(d, meta)
+		if err != nil {
+			return err
+		}
+
+		if d.Get("is_ready").(bool) {
+			return nil
+		}
+
+		if time.Now().Unix()-currentTime > timeout {
+			return fmt.Errorf("Timeout while waiting for private direct connect to become ready")
+		}
 	}
 
 	return resourceNetAPIPrivateDirectConnectRead(d, meta)
