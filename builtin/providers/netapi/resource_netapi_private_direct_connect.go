@@ -78,7 +78,7 @@ func resourceNetAPIPrivateDirectConnect() *schema.Resource {
 			"is_ready_timeout": &schema.Schema{
 				Type:     schema.TypeInt,
 				Optional: true,
-				Default:  600,
+				Default:  3000,
 			},
 		},
 	}
