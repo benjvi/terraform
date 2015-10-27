@@ -20,6 +20,6 @@ ADD . $BUILDDIR
 
 
 RUN cd $BUILDDIR && make updatedeps
-RUN cd $BUILDDIR && make dev
+RUN cd $BUILDDIR && make
 
 ENTRYPOINT ["/opt/bin/terraform"]
