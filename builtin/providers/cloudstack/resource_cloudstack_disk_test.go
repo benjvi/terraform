@@ -10,7 +10,7 @@ import (
 )
 
 func TestAccCloudStackDisk_basic(t *testing.T) {
-	var disk cloudstack.Volume
+	var disk cloudstack43.Volume
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -30,7 +30,7 @@ func TestAccCloudStackDisk_basic(t *testing.T) {
 }
 
 func TestAccCloudStackDisk_device(t *testing.T) {
-	var disk cloudstack.Volume
+	var disk cloudstack43.Volume
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -52,7 +52,7 @@ func TestAccCloudStackDisk_device(t *testing.T) {
 }
 
 func TestAccCloudStackDisk_update(t *testing.T) {
-	var disk cloudstack.Volume
+	var disk cloudstack43.Volume
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -83,7 +83,7 @@ func TestAccCloudStackDisk_update(t *testing.T) {
 }
 
 func testAccCheckCloudStackDiskExists(
-	n string, disk *cloudstack.Volume) resource.TestCheckFunc {
+	n string, disk *cloudstack43.Volume) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -112,7 +112,7 @@ func testAccCheckCloudStackDiskExists(
 }
 
 func testAccCheckCloudStackDiskAttributes(
-	disk *cloudstack.Volume) resource.TestCheckFunc {
+	disk *cloudstack43.Volume) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if disk.Name != "terraform-disk" {
@@ -128,7 +128,7 @@ func testAccCheckCloudStackDiskAttributes(
 }
 
 func testAccCheckCloudStackDiskResized(
-	disk *cloudstack.Volume) resource.TestCheckFunc {
+	disk *cloudstack43.Volume) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if disk.Diskofferingname != CLOUDSTACK_DISK_OFFERING_2 {

@@ -11,7 +11,7 @@ import (
 )
 
 func TestAccCloudStackSSHKeyPair_basic(t *testing.T) {
-	var sshkey cloudstack.SSHKeyPair
+	var sshkey cloudstack43.SSHKeyPair
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -31,7 +31,7 @@ func TestAccCloudStackSSHKeyPair_basic(t *testing.T) {
 }
 
 func TestAccCloudStackSSHKeyPair_register(t *testing.T) {
-	var sshkey cloudstack.SSHKeyPair
+	var sshkey cloudstack43.SSHKeyPair
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -53,7 +53,7 @@ func TestAccCloudStackSSHKeyPair_register(t *testing.T) {
 	})
 }
 
-func testAccCheckCloudStackSSHKeyPairExists(n string, sshkey *cloudstack.SSHKeyPair) resource.TestCheckFunc {
+func testAccCheckCloudStackSSHKeyPairExists(n string, sshkey *cloudstack43.SSHKeyPair) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -84,7 +84,7 @@ func testAccCheckCloudStackSSHKeyPairExists(n string, sshkey *cloudstack.SSHKeyP
 }
 
 func testAccCheckCloudStackSSHKeyPairAttributes(
-	keypair *cloudstack.SSHKeyPair) resource.TestCheckFunc {
+	keypair *cloudstack43.SSHKeyPair) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		fpLen := len(keypair.Fingerprint)

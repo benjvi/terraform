@@ -49,7 +49,7 @@ func testAccCheckNetAPIPrivateDirectConnectExists(
 		}
 
 		cs := testAccProvider.Meta().(*netAPI.NetAPIClient)
-		network, _, err := cs.Network.GetNetworkByID(rs.Primary.ID)
+		network, _, err := cs.Network.GetNetworkByID(rs.Primary.ID, "europe")
 
 		if err != nil {
 			return err

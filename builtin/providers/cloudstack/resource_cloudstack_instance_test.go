@@ -10,7 +10,7 @@ import (
 )
 
 func TestAccCloudStackInstance_basic(t *testing.T) {
-	var instance cloudstack.VirtualMachine
+	var instance cloudstack43.VirtualMachine
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -32,7 +32,7 @@ func TestAccCloudStackInstance_basic(t *testing.T) {
 }
 
 func TestAccCloudStackInstance_update(t *testing.T) {
-	var instance cloudstack.VirtualMachine
+	var instance cloudstack43.VirtualMachine
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -67,7 +67,7 @@ func TestAccCloudStackInstance_update(t *testing.T) {
 }
 
 func TestAccCloudStackInstance_downsize(t *testing.T) {
-	var instance cloudstack.VirtualMachine
+	var instance cloudstack43.VirtualMachine
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -101,7 +101,7 @@ func TestAccCloudStackInstance_downsize(t *testing.T) {
 }
 
 func TestAccCloudStackInstance_fixedIP(t *testing.T) {
-	var instance cloudstack.VirtualMachine
+	var instance cloudstack43.VirtualMachine
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -122,7 +122,7 @@ func TestAccCloudStackInstance_fixedIP(t *testing.T) {
 }
 
 func TestAccCloudStackInstance_keyPair(t *testing.T) {
-	var instance cloudstack.VirtualMachine
+	var instance cloudstack43.VirtualMachine
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -143,7 +143,7 @@ func TestAccCloudStackInstance_keyPair(t *testing.T) {
 }
 
 func TestAccCloudStackInstance_project(t *testing.T) {
-	var instance cloudstack.VirtualMachine
+	var instance cloudstack43.VirtualMachine
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -164,7 +164,7 @@ func TestAccCloudStackInstance_project(t *testing.T) {
 }
 
 func testAccCheckCloudStackInstanceExists(
-	n string, instance *cloudstack.VirtualMachine) resource.TestCheckFunc {
+	n string, instance *cloudstack43.VirtualMachine) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -193,7 +193,7 @@ func testAccCheckCloudStackInstanceExists(
 }
 
 func testAccCheckCloudStackInstanceAttributes(
-	instance *cloudstack.VirtualMachine) resource.TestCheckFunc {
+	instance *cloudstack43.VirtualMachine) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if instance.Name != "terraform-test" {
@@ -221,7 +221,7 @@ func testAccCheckCloudStackInstanceAttributes(
 }
 
 func testAccCheckCloudStackInstanceRenamedResizedAndNetworkAdded(
-	instance *cloudstack.VirtualMachine) resource.TestCheckFunc {
+	instance *cloudstack43.VirtualMachine) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if instance.Displayname != "terraform-updated" {

@@ -10,7 +10,7 @@ import (
 )
 
 func TestAccCloudStackIPAddress_basic(t *testing.T) {
-	var ipaddr cloudstack.PublicIpAddress
+	var ipaddr cloudstack43.PublicIpAddress
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -30,7 +30,7 @@ func TestAccCloudStackIPAddress_basic(t *testing.T) {
 }
 
 func TestAccCloudStackIPAddress_vpc(t *testing.T) {
-	var ipaddr cloudstack.PublicIpAddress
+	var ipaddr cloudstack43.PublicIpAddress
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -51,7 +51,7 @@ func TestAccCloudStackIPAddress_vpc(t *testing.T) {
 }
 
 func testAccCheckCloudStackIPAddressExists(
-	n string, ipaddr *cloudstack.PublicIpAddress) resource.TestCheckFunc {
+	n string, ipaddr *cloudstack43.PublicIpAddress) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -80,7 +80,7 @@ func testAccCheckCloudStackIPAddressExists(
 }
 
 func testAccCheckCloudStackIPAddressAttributes(
-	ipaddr *cloudstack.PublicIpAddress) resource.TestCheckFunc {
+	ipaddr *cloudstack43.PublicIpAddress) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if ipaddr.Associatednetworkname != CLOUDSTACK_NETWORK_1 {
