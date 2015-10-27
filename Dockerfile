@@ -18,8 +18,6 @@ RUN go get -u github.com/mitchellh/gox
 
 ADD . $BUILDDIR
 
-
-RUN cd $BUILDDIR && make updatedeps
-RUN cd $BUILDDIR && make
+RUN cd $BUILDDIR && make updatedeps && make && make dev
 
 ENTRYPOINT ["/opt/bin/terraform"]
