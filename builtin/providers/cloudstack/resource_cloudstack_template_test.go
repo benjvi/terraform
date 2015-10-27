@@ -6,11 +6,11 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackTemplate_basic(t *testing.T) {
-	var template cloudstack.Template
+	var template cloudstack43.Template
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -31,7 +31,7 @@ func TestAccCloudStackTemplate_basic(t *testing.T) {
 }
 
 func TestAccCloudStackTemplate_update(t *testing.T) {
-	var template cloudstack.Template
+	var template cloudstack43.Template
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -61,7 +61,7 @@ func TestAccCloudStackTemplate_update(t *testing.T) {
 }
 
 func testAccCheckCloudStackTemplateExists(
-	n string, template *cloudstack.Template) resource.TestCheckFunc {
+	n string, template *cloudstack43.Template) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -72,7 +72,7 @@ func testAccCheckCloudStackTemplateExists(
 			return fmt.Errorf("No template ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		tmpl, _, err := cs.Template.GetTemplateByID(rs.Primary.ID, "executable")
 
 		if err != nil {
@@ -90,7 +90,7 @@ func testAccCheckCloudStackTemplateExists(
 }
 
 func testAccCheckCloudStackTemplateBasicAttributes(
-	template *cloudstack.Template) resource.TestCheckFunc {
+	template *cloudstack43.Template) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if template.Name != "terraform-test" {
@@ -118,7 +118,7 @@ func testAccCheckCloudStackTemplateBasicAttributes(
 }
 
 func testAccCheckCloudStackTemplateUpdatedAttributes(
-	template *cloudstack.Template) resource.TestCheckFunc {
+	template *cloudstack43.Template) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if template.Displaytext != "terraform-updated" {
@@ -138,7 +138,7 @@ func testAccCheckCloudStackTemplateUpdatedAttributes(
 }
 
 func testAccCheckCloudStackTemplateDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_template" {

@@ -6,11 +6,11 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackNetworkACL_basic(t *testing.T) {
-	var acl cloudstack.NetworkACLList
+	var acl cloudstack43.NetworkACLList
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
@@ -31,7 +31,7 @@ func TestAccCloudStackNetworkACL_basic(t *testing.T) {
 }
 
 func testAccCheckCloudStackNetworkACLExists(
-	n string, acl *cloudstack.NetworkACLList) resource.TestCheckFunc {
+	n string, acl *cloudstack43.NetworkACLList) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -42,7 +42,7 @@ func testAccCheckCloudStackNetworkACLExists(
 			return fmt.Errorf("No network ACL ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		acllist, _, err := cs.NetworkACL.GetNetworkACLListByID(rs.Primary.ID)
 		if err != nil {
 			return err
@@ -59,7 +59,7 @@ func testAccCheckCloudStackNetworkACLExists(
 }
 
 func testAccCheckCloudStackNetworkACLBasicAttributes(
-	acl *cloudstack.NetworkACLList) resource.TestCheckFunc {
+	acl *cloudstack43.NetworkACLList) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if acl.Name != "terraform-acl" {
@@ -75,7 +75,7 @@ func testAccCheckCloudStackNetworkACLBasicAttributes(
 }
 
 func testAccCheckCloudStackNetworkACLDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_network_acl" {

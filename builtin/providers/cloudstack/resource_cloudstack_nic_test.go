@@ -6,11 +6,11 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackNIC_basic(t *testing.T) {
-	var nic cloudstack.Nic
+	var nic cloudstack43.Nic
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -30,7 +30,7 @@ func TestAccCloudStackNIC_basic(t *testing.T) {
 }
 
 func TestAccCloudStackNIC_update(t *testing.T) {
-	var nic cloudstack.Nic
+	var nic cloudstack43.Nic
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -61,7 +61,7 @@ func TestAccCloudStackNIC_update(t *testing.T) {
 }
 
 func testAccCheckCloudStackNICExists(
-	v, n string, nic *cloudstack.Nic) resource.TestCheckFunc {
+	v, n string, nic *cloudstack43.Nic) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rsv, ok := s.RootModule().Resources[v]
 		if !ok {
@@ -81,7 +81,7 @@ func testAccCheckCloudStackNICExists(
 			return fmt.Errorf("No NIC ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		vm, _, err := cs.VirtualMachine.GetVirtualMachineByID(rsv.Primary.ID)
 
 		if err != nil {
@@ -100,7 +100,7 @@ func testAccCheckCloudStackNICExists(
 }
 
 func testAccCheckCloudStackNICAttributes(
-	nic *cloudstack.Nic) resource.TestCheckFunc {
+	nic *cloudstack43.Nic) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if nic.Networkname != CLOUDSTACK_2ND_NIC_NETWORK {
@@ -112,7 +112,7 @@ func testAccCheckCloudStackNICAttributes(
 }
 
 func testAccCheckCloudStackNICIPAddress(
-	nic *cloudstack.Nic) resource.TestCheckFunc {
+	nic *cloudstack43.Nic) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if nic.Networkname != CLOUDSTACK_2ND_NIC_NETWORK {
@@ -128,7 +128,7 @@ func testAccCheckCloudStackNICIPAddress(
 }
 
 func testAccCheckCloudStackNICDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	// Deleting the instance automatically deletes any additional NICs
 	for _, rs := range s.RootModule().Resources {

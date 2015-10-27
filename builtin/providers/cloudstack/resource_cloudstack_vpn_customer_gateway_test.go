@@ -6,11 +6,11 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackVPNCustomerGateway_basic(t *testing.T) {
-	var vpnCustomerGateway cloudstack.VpnCustomerGateway
+	var vpnCustomerGateway cloudstack43.VpnCustomerGateway
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -38,7 +38,7 @@ func TestAccCloudStackVPNCustomerGateway_basic(t *testing.T) {
 }
 
 func TestAccCloudStackVPNCustomerGateway_update(t *testing.T) {
-	var vpnCustomerGateway cloudstack.VpnCustomerGateway
+	var vpnCustomerGateway cloudstack43.VpnCustomerGateway
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -83,7 +83,7 @@ func TestAccCloudStackVPNCustomerGateway_update(t *testing.T) {
 }
 
 func testAccCheckCloudStackVPNCustomerGatewayExists(
-	n string, vpnCustomerGateway *cloudstack.VpnCustomerGateway) resource.TestCheckFunc {
+	n string, vpnCustomerGateway *cloudstack43.VpnCustomerGateway) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -94,7 +94,7 @@ func testAccCheckCloudStackVPNCustomerGatewayExists(
 			return fmt.Errorf("No VPN CustomerGateway ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		v, _, err := cs.VPN.GetVpnCustomerGatewayByID(rs.Primary.ID)
 
 		if err != nil {
@@ -112,7 +112,7 @@ func testAccCheckCloudStackVPNCustomerGatewayExists(
 }
 
 func testAccCheckCloudStackVPNCustomerGatewayAttributes(
-	vpnCustomerGateway *cloudstack.VpnCustomerGateway) resource.TestCheckFunc {
+	vpnCustomerGateway *cloudstack43.VpnCustomerGateway) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if vpnCustomerGateway.Esppolicy != "aes256-sha1" {
@@ -132,7 +132,7 @@ func testAccCheckCloudStackVPNCustomerGatewayAttributes(
 }
 
 func testAccCheckCloudStackVPNCustomerGatewayUpdatedAttributes(
-	vpnCustomerGateway *cloudstack.VpnCustomerGateway) resource.TestCheckFunc {
+	vpnCustomerGateway *cloudstack43.VpnCustomerGateway) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if vpnCustomerGateway.Esppolicy != "3des-md5" {
@@ -152,7 +152,7 @@ func testAccCheckCloudStackVPNCustomerGatewayUpdatedAttributes(
 }
 
 func testAccCheckCloudStackVPNCustomerGatewayDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_vpn_customer_gateway" {

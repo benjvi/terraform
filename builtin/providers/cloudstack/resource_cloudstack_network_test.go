@@ -6,11 +6,11 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackNetwork_basic(t *testing.T) {
-	var network cloudstack.Network
+	var network cloudstack43.Network
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -30,7 +30,7 @@ func TestAccCloudStackNetwork_basic(t *testing.T) {
 }
 
 func TestAccCloudStackNetwork_vpc(t *testing.T) {
-	var network cloudstack.Network
+	var network cloudstack43.Network
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -52,7 +52,7 @@ func TestAccCloudStackNetwork_vpc(t *testing.T) {
 }
 
 func testAccCheckCloudStackNetworkExists(
-	n string, network *cloudstack.Network) resource.TestCheckFunc {
+	n string, network *cloudstack43.Network) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -63,7 +63,7 @@ func testAccCheckCloudStackNetworkExists(
 			return fmt.Errorf("No network ID is set")
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		ntwrk, _, err := cs.Network.GetNetworkByID(rs.Primary.ID)
 
 		if err != nil {
@@ -81,7 +81,7 @@ func testAccCheckCloudStackNetworkExists(
 }
 
 func testAccCheckCloudStackNetworkBasicAttributes(
-	network *cloudstack.Network) resource.TestCheckFunc {
+	network *cloudstack43.Network) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if network.Name != "terraform-network" {
@@ -105,7 +105,7 @@ func testAccCheckCloudStackNetworkBasicAttributes(
 }
 
 func testAccCheckCloudStackNetworkVPCAttributes(
-	network *cloudstack.Network) resource.TestCheckFunc {
+	network *cloudstack43.Network) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 
 		if network.Name != "terraform-network" {
@@ -129,7 +129,7 @@ func testAccCheckCloudStackNetworkVPCAttributes(
 }
 
 func testAccCheckCloudStackNetworkDestroy(s *terraform.State) error {
-	cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+	cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "cloudstack_network" {

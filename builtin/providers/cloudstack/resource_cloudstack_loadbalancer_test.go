@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/xanzy/go-cloudstack/cloudstack43"
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackLoadBalancerRule_basic(t *testing.T) {
@@ -196,7 +196,7 @@ func testAccCheckCloudStackLoadBalancerRuleExist(n string, id *string) resource.
 			*id = rs.Primary.ID
 		}
 
-		cs := testAccProvider.Meta().(*cloudstack.CloudStackClient)
+		cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
 		_, count, err := cs.LoadBalancer.GetLoadBalancerRuleByID(rs.Primary.ID)
 
 		if err != nil {
