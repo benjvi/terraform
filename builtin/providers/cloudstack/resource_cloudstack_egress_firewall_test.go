@@ -123,7 +123,7 @@ func testAccCheckCloudStackEgressFirewallRulesExist(n string) resource.TestCheck
 			return fmt.Errorf("No firewall ID is set")
 		}
 
-		for k, uuid := range rs.Primary.Attributes {
+		for k, id := range rs.Primary.Attributes {
 			if !strings.Contains(k, ".uuids.") || strings.HasSuffix(k, ".uuids.#") {
 				continue
 			}
@@ -156,7 +156,7 @@ func testAccCheckCloudStackEgressFirewallDestroy(s *terraform.State) error {
 			return fmt.Errorf("No instance ID is set")
 		}
 
-		for k, uuid := range rs.Primary.Attributes {
+		for k, id := range rs.Primary.Attributes {
 			if !strings.Contains(k, ".uuids.") || strings.HasSuffix(k, ".uuids.#") {
 				continue
 			}

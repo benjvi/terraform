@@ -130,14 +130,14 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	cs := meta.(*cloudstack43.CloudStackClient)
 	d.Partial(true)
 
-	// Retrieve the service_offering UUID
-	serviceofferingid, e := retrieveUUID(cs, "service_offering", d.Get("service_offering").(string))
+	// Retrieve the service_offering ID
+	serviceofferingid, e := retrieveID(cs, "service_offering", d.Get("service_offering").(string))
 	if e != nil {
 		return e.Error()
 	}
 
-	// Retrieve the zone UUID
-	zoneid, e := retrieveUUID(cs, "zone", d.Get("zone").(string))
+	// Retrieve the zone ID
+	zoneid, e := retrieveID(cs, "zone", d.Get("zone").(string))
 	if e != nil {
 		return e.Error()
 	}
@@ -148,8 +148,8 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		return err
 	}
 
-	// Retrieve the template UUID
-	templateid, e := retrieveTemplateUUID(cs, zone.Id, d.Get("template").(string))
+	// Retrieve the template ID
+	templateid, e := retrieveTemplateID(cs, zone.Id, d.Get("template").(string))
 	if e != nil {
 		return e.Error()
 	}
@@ -171,14 +171,14 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	if zone.Networktype == "Advanced" {
 		networkSlice := []string{}
 		// Retrieve the network UUID
-		networkid, e := retrieveUUID(cs, "network", d.Get("network").(string))
+		networkid, e := retrieveID(cs, "network", d.Get("network").(string))
 		if e != nil {
 			return e.Error()
 		}
 		networkSlice = append(networkSlice, networkid)
 
 		if secondnetwork, ok := d.GetOk("second_network"); ok {
-			networkid, e = retrieveUUID(cs, "network", secondnetwork.(string))
+			networkid, e = retrieveID(cs, "network", secondnetwork.(string))
 			if e != nil {
 				return e.Error()
 			}
@@ -195,8 +195,8 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 
 	// If there is a project supplied, we retrieve and set the project id
 	if project, ok := d.GetOk("project"); ok {
-		// Retrieve the project UUID
-		projectid, e := retrieveUUID(cs, "project", project.(string))
+		// Retrieve the project ID
+		projectid, e := retrieveID(cs, "project", project.(string))
 		if e != nil {
 			return e.Error()
 		}
@@ -271,17 +271,17 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	d.Set("ipaddress", vm.Nic[0].Ipaddress)
 	//NB cloudstack sometimes sends back the wrong keypair name, so dont update it
 
-	setValueOrUUID(d, "network", vm.Nic[0].Networkname, vm.Nic[0].Networkid)
+	setValueOrID(d, "network", vm.Nic[0].Networkname, vm.Nic[0].Networkid)
 
 	if len(vm.Nic) > 1 {
-		setValueOrUUID(d, "second_network", vm.Nic[1].Networkname, vm.Nic[1].Networkid)
+		setValueOrID(d, "second_network", vm.Nic[1].Networkname, vm.Nic[1].Networkid)
 		d.Set("second_ipaddress", vm.Nic[1].Ipaddress)
 	}
 
-	setValueOrUUID(d, "service_offering", vm.Serviceofferingname, vm.Serviceofferingid)
-	setValueOrUUID(d, "template", vm.Templatename, vm.Templateid)
-	setValueOrUUID(d, "project", vm.Project, vm.Projectid)
-	setValueOrUUID(d, "zone", vm.Zonename, vm.Zoneid)
+	setValueOrID(d, "service_offering", vm.Serviceofferingname, vm.Serviceofferingid)
+	setValueOrID(d, "template", vm.Templatename, vm.Templateid)
+	setValueOrID(d, "project", vm.Project, vm.Projectid)
+	setValueOrID(d, "zone", vm.Zonename, vm.Zoneid)
 
 	return nil
 }
@@ -325,8 +325,8 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 		if d.HasChange("service_offering") {
 			log.Printf("[DEBUG] Service offering changed for %s, starting update", name)
 
-			// Retrieve the service_offering UUID
-			serviceofferingid, e := retrieveUUID(cs, "service_offering", d.Get("service_offering").(string))
+			// Retrieve the service_offering ID
+			serviceofferingid, e := retrieveID(cs, "service_offering", d.Get("service_offering").(string))
 			if e != nil {
 				return e.Error()
 			}
