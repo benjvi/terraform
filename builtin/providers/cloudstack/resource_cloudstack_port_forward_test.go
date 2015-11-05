@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/benjvi/go-cloudstack/cloudstack43"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/benjvi/go-cloudstack/cloudstack43"
 )
 
 func TestAccCloudStackPortForward_basic(t *testing.T) {

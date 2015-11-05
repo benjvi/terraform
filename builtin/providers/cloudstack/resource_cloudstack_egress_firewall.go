@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/benjvi/go-cloudstack/cloudstack43"
 	"github.com/hashicorp/terraform/helper/hashcode"
@@ -73,9 +74,16 @@ func resourceCloudStackEgressFirewall() *schema.Resource {
 							Type:     schema.TypeMap,
 							Computed: true,
 						},
+
 					},
 				},
 				Set: resourceCloudStackEgressFirewallRuleHash,
+			},
+
+			"rule_creation_timeout": &schema.Schema{
+				Type:     schema.TypeInt,
+				Optional: true,
+				Default:  60,
 			},
 		},
 	}
@@ -188,6 +196,31 @@ func resourceCloudStackEgressFirewallCreateRule(
 					return err
 				}
 
+				// If the rule is not active, we must wait for it
+				currentTime := time.Now().Unix()
+				timeout := int64(d.Get("rule_creation_timeout").(int))
+				for {
+					if r.State == "Active" {
+						break
+					}
+					fmt.Sprintf("Waiting for egress firewall rule to become active")
+
+					time.Sleep(2 * time.Second)
+
+					r, count, err := cs.Firewall.GetEgressFirewallRuleByID(r.Id)
+					if err != nil {
+						if count == 0 {
+							return fmt.Errorf("Can't find the egress firewall rule we just created: %s", r.Id)
+						}
+						return err
+					}
+
+
+					if time.Now().Unix()-currentTime > timeout {
+						return fmt.Errorf("Timeout while waiting for egress firewall rule to become ready")
+					}
+				}
+
 				ports.Add(port)
 				rule["ports"] = ports
 
@@ -264,6 +297,10 @@ func resourceCloudStackEgressFirewallRead(d *schema.ResourceData, meta interface
 							if count == 0 {
 								delete(uuids, port.(string))
 								continue
+							}
+							if r.State != "Active" {
+								// The resource is not in an ok state - throw an error
+								fmt.Errorf("Firewall rule %d on port %s is in a transient state: %s. Wait for this resource to complete.", id.(string), port.(string), r.State)
 							}
 
 							return err
