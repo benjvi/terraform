@@ -108,7 +108,7 @@ func testAccCheckCloudStackPortForwardsExist(n string) resource.TestCheckFunc {
 			}
 
 			cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
-			_, count, err := cs.Firewall.GetPortForwardingRuleByID(uuid)
+			_, count, err := cs.Firewall.GetPortForwardingRuleByID(id)
 
 			if err != nil {
 				return err

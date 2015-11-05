@@ -116,7 +116,7 @@ func testAccCheckCloudStackFirewallRulesExist(n string) resource.TestCheckFunc {
 			}
 
 			cs := testAccProvider.Meta().(*cloudstack43.CloudStackClient)
-			_, count, err := cs.Firewall.GetFirewallRuleByID(uuid)
+			_, count, err := cs.Firewall.GetFirewallRuleByID(id)
 
 			if err != nil {
 				return err
@@ -148,7 +148,7 @@ func testAccCheckCloudStackFirewallDestroy(s *terraform.State) error {
 				continue
 			}
 
-			p := cs.Firewall.NewDeleteFirewallRuleParams(uuid)
+			p := cs.Firewall.NewDeleteFirewallRuleParams(id)
 			_, err := cs.Firewall.DeleteFirewallRule(p, true)
 
 			if err != nil {
