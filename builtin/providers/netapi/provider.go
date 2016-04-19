@@ -32,6 +32,12 @@ func Provider() terraform.ResourceProvider {
 				Optional: true,
 				Default:  "",
 			},
+
+			"domain_id": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
@@ -49,6 +55,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		ApiKey:    d.Get("api_key").(string),
 		SecretKey: d.Get("secret_key").(string),
 		Acronym:   d.Get("acronym").(string),
+		Domainid:  d.Get("domain_id").(string),
 	}
 
 	return config.NewClient()

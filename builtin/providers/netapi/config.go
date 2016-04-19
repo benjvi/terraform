@@ -9,10 +9,11 @@ type Config struct {
 	ApiKey    string
 	SecretKey string
 	Acronym   string
+	Domainid  string
 }
 
 // Client() returns a new CloudStack client.
 func (c *Config) NewClient() (*netAPI.NetAPIClient, error) {
-	cs := netAPI.NewClient(c.ApiURL, c.ApiKey, c.SecretKey, c.Acronym, false)
+	cs := netAPI.NewClient(c.ApiURL, c.ApiKey, c.SecretKey, c.Acronym, c.Domainid, false)
 	return cs, nil
 }
