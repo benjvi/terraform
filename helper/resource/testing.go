@@ -13,10 +13,15 @@ import (
 
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/terraform/config/module"
+	"github.com/hashicorp/terraform/helper/logging"
 	"github.com/hashicorp/terraform/terraform"
 )
 
 const TestEnvVar = "TF_ACC"
+
+// UnitTestOverride is a value that when set in TestEnvVar indicates that this
+// is a unit test borrowing the acceptance testing framework.
+const UnitTestOverride = "UnitTestOverride"
 
 // TestCheckFunc is the callback type used with acceptance tests to check
 // the state of a resource. The state passed in is the latest state known,
@@ -81,6 +86,10 @@ type TestStep struct {
 
 	// Destroy will create a destroy plan if set to true.
 	Destroy bool
+
+	// ExpectNonEmptyPlan can be set to true for specific types of tests that are
+	// looking to verify that a diff occurs
+	ExpectNonEmptyPlan bool
 }
 
 // Test performs an acceptance test on a resource.
@@ -103,8 +112,16 @@ func Test(t TestT, c TestCase) {
 		return
 	}
 
+	isUnitTest := (os.Getenv(TestEnvVar) == UnitTestOverride)
+
+	logWriter, err := logging.LogOutput()
+	if err != nil {
+		t.Error(fmt.Errorf("error setting up logging: %s", err))
+	}
+	log.SetOutput(logWriter)
+
 	// We require verbose mode so that the user knows what is going on.
-	if !testTesting && !testing.Verbose() {
+	if !testTesting && !testing.Verbose() && !isUnitTest {
 		t.Fatal("Acceptance tests must be run with the -v flag on tests")
 		return
 	}
@@ -160,6 +177,22 @@ func Test(t TestT, c TestCase) {
 	} else {
 		log.Printf("[WARN] Skipping destroy test since there is no state.")
 	}
+}
+
+// UnitTest is a helper to force the acceptance testing harness to run in the
+// normal unit test suite. This should only be used for resource that don't
+// have any external dependencies.
+func UnitTest(t TestT, c TestCase) {
+	oldEnv := os.Getenv(TestEnvVar)
+	if err := os.Setenv(TestEnvVar, UnitTestOverride); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Setenv(TestEnvVar, oldEnv); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	Test(t, c)
 }
 
 func testStep(
@@ -240,6 +273,11 @@ func testStep(
 		log.Printf("[WARN] Test: Step plan: %s", p)
 	}
 
+	// We need to keep a copy of the state prior to destroying
+	// such that destroy steps can verify their behaviour in the check
+	// function
+	stateBeforeApplication := state.DeepCopy()
+
 	// Apply!
 	state, err = ctx.Apply()
 	if err != nil {
@@ -248,17 +286,27 @@ func testStep(
 
 	// Check! Excitement!
 	if step.Check != nil {
-		if err := step.Check(state); err != nil {
-			return state, fmt.Errorf("Check failed: %s", err)
+		if step.Destroy {
+			if err := step.Check(stateBeforeApplication); err != nil {
+				return state, fmt.Errorf("Check failed: %s", err)
+			}
+		} else {
+			if err := step.Check(state); err != nil {
+				return state, fmt.Errorf("Check failed: %s", err)
+			}
 		}
 	}
 
 	// Now, verify that Plan is now empty and we don't have a perpetual diff issue
 	// We do this with TWO plans. One without a refresh.
-	if p, err := ctx.Plan(); err != nil {
+	var p *terraform.Plan
+	if p, err = ctx.Plan(); err != nil {
 		return state, fmt.Errorf("Error on follow-up plan: %s", err)
-	} else {
-		if p.Diff != nil && !p.Diff.Empty() {
+	}
+	if p.Diff != nil && !p.Diff.Empty() {
+		if step.ExpectNonEmptyPlan {
+			log.Printf("[INFO] Got non-empty plan, as expected:\n\n%s", p)
+		} else {
 			return state, fmt.Errorf(
 				"After applying this step, the plan was not empty:\n\n%s", p)
 		}
@@ -270,13 +318,22 @@ func testStep(
 		return state, fmt.Errorf(
 			"Error on follow-up refresh: %s", err)
 	}
-	if p, err := ctx.Plan(); err != nil {
+	if p, err = ctx.Plan(); err != nil {
 		return state, fmt.Errorf("Error on second follow-up plan: %s", err)
-	} else {
-		if p.Diff != nil && !p.Diff.Empty() {
+	}
+	if p.Diff != nil && !p.Diff.Empty() {
+		if step.ExpectNonEmptyPlan {
+			log.Printf("[INFO] Got non-empty plan, as expected:\n\n%s", p)
+		} else {
 			return state, fmt.Errorf(
-				"After applying this step and refreshing, the plan was not empty:\n\n%s", p)
+				"After applying this step and refreshing, "+
+					"the plan was not empty:\n\n%s", p)
 		}
+	}
+
+	// Made it here, but expected a non-empty plan, fail!
+	if step.ExpectNonEmptyPlan && (p.Diff == nil || p.Diff.Empty()) {
+		return state, fmt.Errorf("Expected a non-empty plan, but got an empty plan!")
 	}
 
 	// Made it here? Good job test step!
@@ -290,9 +347,9 @@ func testStep(
 // into smaller pieces more easily.
 func ComposeTestCheckFunc(fs ...TestCheckFunc) TestCheckFunc {
 	return func(s *terraform.State) error {
-		for _, f := range fs {
+		for i, f := range fs {
 			if err := f(s); err != nil {
-				return err
+				return fmt.Errorf("Check %d/%d error: %s", i+1, len(fs), err)
 			}
 		}
 
@@ -358,6 +415,27 @@ func TestMatchResourceAttr(name, key string, r *regexp.Regexp) TestCheckFunc {
 func TestCheckResourceAttrPtr(name string, key string, value *string) TestCheckFunc {
 	return func(s *terraform.State) error {
 		return TestCheckResourceAttr(name, key, *value)(s)
+	}
+}
+
+// TestCheckOutput checks an output in the Terraform configuration
+func TestCheckOutput(name, value string) TestCheckFunc {
+	return func(s *terraform.State) error {
+		ms := s.RootModule()
+		rs, ok := ms.Outputs[name]
+		if !ok {
+			return fmt.Errorf("Not found: %s", name)
+		}
+
+		if rs != value {
+			return fmt.Errorf(
+				"Output '%s': expected %#v, got %#v",
+				name,
+				value,
+				rs)
+		}
+
+		return nil
 	}
 }
 

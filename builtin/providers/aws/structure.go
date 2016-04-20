@@ -4,19 +4,25 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/apigateway"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
+	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/directoryservice"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/aws/aws-sdk-go/service/elasticbeanstalk"
 	elasticsearch "github.com/aws/aws-sdk-go/service/elasticsearchservice"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go/service/redshift"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/hashicorp/terraform/helper/schema"
 )
@@ -44,7 +50,23 @@ func expandListeners(configured []interface{}) ([]*elb.Listener, error) {
 			l.SSLCertificateId = aws.String(v.(string))
 		}
 
-		listeners = append(listeners, l)
+		var valid bool
+		if l.SSLCertificateId != nil && *l.SSLCertificateId != "" {
+			// validate the protocol is correct
+			for _, p := range []string{"https", "ssl"} {
+				if (strings.ToLower(*l.InstanceProtocol) == p) || (strings.ToLower(*l.Protocol) == p) {
+					valid = true
+				}
+			}
+		} else {
+			valid = true
+		}
+
+		if valid {
+			listeners = append(listeners, l)
+		} else {
+			return nil, fmt.Errorf("[ERR] ELB Listener: ssl_certificate_id may be set only when protocol is 'https' or 'ssl'")
+		}
 	}
 
 	return listeners, nil
@@ -62,9 +84,13 @@ func expandEcsVolumes(configured []interface{}) ([]*ecs.Volume, error) {
 
 		l := &ecs.Volume{
 			Name: aws.String(data["name"].(string)),
-			Host: &ecs.HostVolumeProperties{
-				SourcePath: aws.String(data["host_path"].(string)),
-			},
+		}
+
+		hostPath := data["host_path"].(string)
+		if hostPath != "" {
+			l.Host = &ecs.HostVolumeProperties{
+				SourcePath: aws.String(hostPath),
+			}
 		}
 
 		volumes = append(volumes, l)
@@ -114,7 +140,7 @@ func expandEcsLoadBalancers(configured []interface{}) []*ecs.LoadBalancer {
 // to_port or from_port set to a non-zero value.
 func expandIPPerms(
 	group *ec2.SecurityGroup, configured []interface{}) ([]*ec2.IpPermission, error) {
-	vpc := group.VpcId != nil
+	vpc := group.VpcId != nil && *group.VpcId != ""
 
 	perms := make([]*ec2.IpPermission, len(configured))
 	for i, mRaw := range configured {
@@ -213,6 +239,29 @@ func expandParameters(configured []interface{}) ([]*rds.Parameter, error) {
 	return parameters, nil
 }
 
+func expandRedshiftParameters(configured []interface{}) ([]*redshift.Parameter, error) {
+	var parameters []*redshift.Parameter
+
+	// Loop over our configured parameters and create
+	// an array of aws-sdk-go compatabile objects
+	for _, pRaw := range configured {
+		data := pRaw.(map[string]interface{})
+
+		if data["name"].(string) == "" {
+			continue
+		}
+
+		p := &redshift.Parameter{
+			ParameterName:  aws.String(data["name"].(string)),
+			ParameterValue: aws.String(data["value"].(string)),
+		}
+
+		parameters = append(parameters, p)
+	}
+
+	return parameters, nil
+}
+
 // Takes the result of flatmap.Expand for an array of parameters and
 // returns Parameter API compatible objects
 func expandElastiCacheParameters(configured []interface{}) ([]*elasticache.ParameterNameValue, error) {
@@ -234,6 +283,82 @@ func expandElastiCacheParameters(configured []interface{}) ([]*elasticache.Param
 	return parameters, nil
 }
 
+// Flattens an access log into something that flatmap.Flatten() can handle
+func flattenAccessLog(l *elb.AccessLog) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, 1)
+
+	if l != nil && *l.Enabled {
+		r := make(map[string]interface{})
+		if l.S3BucketName != nil {
+			r["bucket"] = *l.S3BucketName
+		}
+
+		if l.S3BucketPrefix != nil {
+			r["bucket_prefix"] = *l.S3BucketPrefix
+		}
+
+		if l.EmitInterval != nil {
+			r["interval"] = *l.EmitInterval
+		}
+
+		result = append(result, r)
+	}
+
+	return result
+}
+
+// Takes the result of flatmap.Expand for an array of step adjustments and
+// returns a []*autoscaling.StepAdjustment.
+func expandStepAdjustments(configured []interface{}) ([]*autoscaling.StepAdjustment, error) {
+	var adjustments []*autoscaling.StepAdjustment
+
+	// Loop over our configured step adjustments and create an array
+	// of aws-sdk-go compatible objects. We're forced to convert strings
+	// to floats here because there's no way to detect whether or not
+	// an uninitialized, optional schema element is "0.0" deliberately.
+	// With strings, we can test for "", which is definitely an empty
+	// struct value.
+	for _, raw := range configured {
+		data := raw.(map[string]interface{})
+		a := &autoscaling.StepAdjustment{
+			ScalingAdjustment: aws.Int64(int64(data["scaling_adjustment"].(int))),
+		}
+		if data["metric_interval_lower_bound"] != "" {
+			bound := data["metric_interval_lower_bound"]
+			switch bound := bound.(type) {
+			case string:
+				f, err := strconv.ParseFloat(bound, 64)
+				if err != nil {
+					return nil, fmt.Errorf(
+						"metric_interval_lower_bound must be a float value represented as a string")
+				}
+				a.MetricIntervalLowerBound = aws.Float64(f)
+			default:
+				return nil, fmt.Errorf(
+					"metric_interval_lower_bound isn't a string. This is a bug. Please file an issue.")
+			}
+		}
+		if data["metric_interval_upper_bound"] != "" {
+			bound := data["metric_interval_upper_bound"]
+			switch bound := bound.(type) {
+			case string:
+				f, err := strconv.ParseFloat(bound, 64)
+				if err != nil {
+					return nil, fmt.Errorf(
+						"metric_interval_upper_bound must be a float value represented as a string")
+				}
+				a.MetricIntervalUpperBound = aws.Float64(f)
+			default:
+				return nil, fmt.Errorf(
+					"metric_interval_upper_bound isn't a string. This is a bug. Please file an issue.")
+			}
+		}
+		adjustments = append(adjustments, a)
+	}
+
+	return adjustments, nil
+}
+
 // Flattens a health check into something that flatmap.Flatten()
 // can handle
 func flattenHealthCheck(check *elb.HealthCheck) []map[string]interface{} {
@@ -251,11 +376,41 @@ func flattenHealthCheck(check *elb.HealthCheck) []map[string]interface{} {
 	return result
 }
 
-// Flattens an array of UserSecurityGroups into a []string
-func flattenSecurityGroups(list []*ec2.UserIdGroupPair) []string {
-	result := make([]string, 0, len(list))
+// Flattens an array of UserSecurityGroups into a []*ec2.GroupIdentifier
+func flattenSecurityGroups(list []*ec2.UserIdGroupPair, ownerId *string) []*ec2.GroupIdentifier {
+	result := make([]*ec2.GroupIdentifier, 0, len(list))
 	for _, g := range list {
-		result = append(result, *g.GroupId)
+		var userId *string
+		if g.UserId != nil && *g.UserId != "" && (ownerId == nil || *ownerId != *g.UserId) {
+			userId = g.UserId
+		}
+		// userid nil here for same vpc groups
+
+		vpc := g.GroupName == nil || *g.GroupName == ""
+		var id *string
+		if vpc {
+			id = g.GroupId
+		} else {
+			id = g.GroupName
+		}
+
+		// id is groupid for vpcs
+		// id is groupname for non vpc (classic)
+
+		if userId != nil {
+			id = aws.String(*userId + "/" + *id)
+		}
+
+		if vpc {
+			result = append(result, &ec2.GroupIdentifier{
+				GroupId: id,
+			})
+		} else {
+			result = append(result, &ec2.GroupIdentifier{
+				GroupId:   g.GroupId,
+				GroupName: id,
+			})
+		}
 	}
 	return result
 }
@@ -314,9 +469,13 @@ func flattenEcsVolumes(list []*ecs.Volume) []map[string]interface{} {
 	result := make([]map[string]interface{}, 0, len(list))
 	for _, volume := range list {
 		l := map[string]interface{}{
-			"name":      *volume.Name,
-			"host_path": *volume.Host.SourcePath,
+			"name": *volume.Name,
 		}
+
+		if volume.Host.SourcePath != nil {
+			l["host_path"] = *volume.Host.SourcePath
+		}
+
 		result = append(result, l)
 	}
 	return result
@@ -351,6 +510,24 @@ func flattenEcsContainerDefinitions(definitions []*ecs.ContainerDefinition) (str
 func flattenParameters(list []*rds.Parameter) []map[string]interface{} {
 	result := make([]map[string]interface{}, 0, len(list))
 	for _, i := range list {
+		if i.ParameterName != nil {
+			r := make(map[string]interface{})
+			r["name"] = strings.ToLower(*i.ParameterName)
+			// Default empty string, guard against nil parameter values
+			r["value"] = ""
+			if i.ParameterValue != nil {
+				r["value"] = strings.ToLower(*i.ParameterValue)
+			}
+			result = append(result, r)
+		}
+	}
+	return result
+}
+
+// Flattens an array of Redshift Parameters into a []map[string]interface{}
+func flattenRedshiftParameters(list []*redshift.Parameter) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(list))
+	for _, i := range list {
 		result = append(result, map[string]interface{}{
 			"name":  strings.ToLower(*i.ParameterName),
 			"value": strings.ToLower(*i.ParameterValue),
@@ -379,6 +556,11 @@ func expandStringList(configured []interface{}) []*string {
 		vs = append(vs, aws.String(v.(string)))
 	}
 	return vs
+}
+
+// Takes the result of schema.Set of strings and returns a []*string
+func expandStringSet(configured *schema.Set) []*string {
+	return expandStringList(configured.List())
 }
 
 // Takes list of pointers to strings. Expand to an array
@@ -436,6 +618,24 @@ func flattenAttachment(a *ec2.NetworkInterfaceAttachment) map[string]interface{}
 	return att
 }
 
+// Flattens step adjustments into a list of map[string]interface.
+func flattenStepAdjustments(adjustments []*autoscaling.StepAdjustment) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(adjustments))
+	for _, raw := range adjustments {
+		a := map[string]interface{}{
+			"scaling_adjustment": *raw.ScalingAdjustment,
+		}
+		if raw.MetricIntervalUpperBound != nil {
+			a["metric_interval_upper_bound"] = *raw.MetricIntervalUpperBound
+		}
+		if raw.MetricIntervalLowerBound != nil {
+			a["metric_interval_lower_bound"] = *raw.MetricIntervalLowerBound
+		}
+		result = append(result, a)
+	}
+	return result
+}
+
 func flattenResourceRecords(recs []*route53.ResourceRecord) []string {
 	strs := make([]string, 0, len(recs))
 	for _, r := range recs {
@@ -452,7 +652,7 @@ func expandResourceRecords(recs []interface{}, typeStr string) []*route53.Resour
 	for _, r := range recs {
 		s := r.(string)
 		switch typeStr {
-		case "TXT":
+		case "TXT", "SPF":
 			str := fmt.Sprintf("\"%s\"", s)
 			records = append(records, &route53.ResourceRecord{Value: aws.String(str)})
 		default:
@@ -460,27 +660,6 @@ func expandResourceRecords(recs []interface{}, typeStr string) []*route53.Resour
 		}
 	}
 	return records
-}
-
-func validateRdsId(v interface{}, k string) (ws []string, errors []error) {
-	value := v.(string)
-	if !regexp.MustCompile(`^[0-9a-z-]+$`).MatchString(value) {
-		errors = append(errors, fmt.Errorf(
-			"only lowercase alphanumeric characters and hyphens allowed in %q", k))
-	}
-	if !regexp.MustCompile(`^[a-z]`).MatchString(value) {
-		errors = append(errors, fmt.Errorf(
-			"first character of %q must be a letter", k))
-	}
-	if regexp.MustCompile(`--`).MatchString(value) {
-		errors = append(errors, fmt.Errorf(
-			"%q cannot contain two consecutive hyphens", k))
-	}
-	if regexp.MustCompile(`-$`).MatchString(value) {
-		errors = append(errors, fmt.Errorf(
-			"%q cannot end with a hyphen", k))
-	}
-	return
 }
 
 func expandESClusterConfig(m map[string]interface{}) *elasticsearch.ElasticsearchClusterConfig {
@@ -597,6 +776,48 @@ func flattenDSVpcSettings(
 	s *directoryservice.DirectoryVpcSettingsDescription) []map[string]interface{} {
 	settings := make(map[string]interface{}, 0)
 
+	if s == nil {
+		return nil
+	}
+
+	settings["subnet_ids"] = schema.NewSet(schema.HashString, flattenStringList(s.SubnetIds))
+	settings["vpc_id"] = *s.VpcId
+
+	return []map[string]interface{}{settings}
+}
+
+func flattenLambdaVpcConfigResponse(s *lambda.VpcConfigResponse) []map[string]interface{} {
+	settings := make(map[string]interface{}, 0)
+
+	if s == nil {
+		return nil
+	}
+
+	if len(s.SubnetIds) == 0 && len(s.SecurityGroupIds) == 0 && s.VpcId == nil {
+		return nil
+	}
+
+	settings["subnet_ids"] = schema.NewSet(schema.HashString, flattenStringList(s.SubnetIds))
+	settings["security_group_ids"] = schema.NewSet(schema.HashString, flattenStringList(s.SecurityGroupIds))
+	if s.VpcId != nil {
+		settings["vpc_id"] = *s.VpcId
+	}
+
+	return []map[string]interface{}{settings}
+}
+
+func flattenDSConnectSettings(
+	customerDnsIps []*string,
+	s *directoryservice.DirectoryConnectSettingsDescription) []map[string]interface{} {
+	if s == nil {
+		return nil
+	}
+
+	settings := make(map[string]interface{}, 0)
+
+	settings["customer_dns_ips"] = schema.NewSet(schema.HashString, flattenStringList(customerDnsIps))
+	settings["connect_ips"] = schema.NewSet(schema.HashString, flattenStringList(s.ConnectIps))
+	settings["customer_username"] = *s.CustomerUserName
 	settings["subnet_ids"] = schema.NewSet(schema.HashString, flattenStringList(s.SubnetIds))
 	settings["vpc_id"] = *s.VpcId
 
@@ -655,4 +876,224 @@ func flattenCloudFormationOutputs(cfOutputs []*cloudformation.Output) map[string
 		outputs[*o.OutputKey] = *o.OutputValue
 	}
 	return outputs
+}
+
+func flattenAsgEnabledMetrics(list []*autoscaling.EnabledMetric) []string {
+	strs := make([]string, 0, len(list))
+	for _, r := range list {
+		if r.Metric != nil {
+			strs = append(strs, *r.Metric)
+		}
+	}
+	return strs
+}
+
+func expandApiGatewayStageKeys(d *schema.ResourceData) []*apigateway.StageKey {
+	var stageKeys []*apigateway.StageKey
+
+	if stageKeyData, ok := d.GetOk("stage_key"); ok {
+		params := stageKeyData.(*schema.Set).List()
+		for k := range params {
+			data := params[k].(map[string]interface{})
+			stageKeys = append(stageKeys, &apigateway.StageKey{
+				RestApiId: aws.String(data["rest_api_id"].(string)),
+				StageName: aws.String(data["stage_name"].(string)),
+			})
+		}
+	}
+
+	return stageKeys
+}
+
+func expandApiGatewayRequestResponseModelOperations(d *schema.ResourceData, key string, prefix string) []*apigateway.PatchOperation {
+	operations := make([]*apigateway.PatchOperation, 0)
+
+	oldModels, newModels := d.GetChange(key)
+	oldModelMap := oldModels.(map[string]interface{})
+	newModelMap := newModels.(map[string]interface{})
+
+	for k, _ := range oldModelMap {
+		operation := apigateway.PatchOperation{
+			Op:   aws.String("remove"),
+			Path: aws.String(fmt.Sprintf("/%s/%s", prefix, strings.Replace(k, "/", "~1", -1))),
+		}
+
+		for nK, nV := range newModelMap {
+			if nK == k {
+				operation.Op = aws.String("replace")
+				operation.Value = aws.String(nV.(string))
+			}
+		}
+
+		operations = append(operations, &operation)
+	}
+
+	for nK, nV := range newModelMap {
+		exists := false
+		for k, _ := range oldModelMap {
+			if k == nK {
+				exists = true
+			}
+		}
+		if !exists {
+			operation := apigateway.PatchOperation{
+				Op:    aws.String("add"),
+				Path:  aws.String(fmt.Sprintf("/%s/%s", prefix, strings.Replace(nK, "/", "~1", -1))),
+				Value: aws.String(nV.(string)),
+			}
+			operations = append(operations, &operation)
+		}
+	}
+
+	return operations
+}
+
+func expandApiGatewayStageKeyOperations(d *schema.ResourceData) []*apigateway.PatchOperation {
+	operations := make([]*apigateway.PatchOperation, 0)
+
+	prev, curr := d.GetChange("stage_key")
+	prevList := prev.(*schema.Set).List()
+	currList := curr.(*schema.Set).List()
+
+	for i := range prevList {
+		p := prevList[i].(map[string]interface{})
+		exists := false
+
+		for j := range currList {
+			c := currList[j].(map[string]interface{})
+			if c["rest_api_id"].(string) == p["rest_api_id"].(string) && c["stage_name"].(string) == p["stage_name"].(string) {
+				exists = true
+			}
+		}
+
+		if !exists {
+			operations = append(operations, &apigateway.PatchOperation{
+				Op:    aws.String("remove"),
+				Path:  aws.String("/stages"),
+				Value: aws.String(fmt.Sprintf("%s/%s", p["rest_api_id"].(string), p["stage_name"].(string))),
+			})
+		}
+	}
+
+	for i := range currList {
+		c := currList[i].(map[string]interface{})
+		exists := false
+
+		for j := range prevList {
+			p := prevList[j].(map[string]interface{})
+			if c["rest_api_id"].(string) == p["rest_api_id"].(string) && c["stage_name"].(string) == p["stage_name"].(string) {
+				exists = true
+			}
+		}
+
+		if !exists {
+			operations = append(operations, &apigateway.PatchOperation{
+				Op:    aws.String("add"),
+				Path:  aws.String("/stages"),
+				Value: aws.String(fmt.Sprintf("%s/%s", c["rest_api_id"].(string), c["stage_name"].(string))),
+			})
+		}
+	}
+
+	return operations
+}
+
+func expandCloudWachLogMetricTransformations(m map[string]interface{}) []*cloudwatchlogs.MetricTransformation {
+	transformation := cloudwatchlogs.MetricTransformation{
+		MetricName:      aws.String(m["name"].(string)),
+		MetricNamespace: aws.String(m["namespace"].(string)),
+		MetricValue:     aws.String(m["value"].(string)),
+	}
+
+	return []*cloudwatchlogs.MetricTransformation{&transformation}
+}
+
+func flattenCloudWachLogMetricTransformations(ts []*cloudwatchlogs.MetricTransformation) map[string]string {
+	m := make(map[string]string, 0)
+
+	m["name"] = *ts[0].MetricName
+	m["namespace"] = *ts[0].MetricNamespace
+	m["value"] = *ts[0].MetricValue
+
+	return m
+}
+
+func flattenBeanstalkAsg(list []*elasticbeanstalk.AutoScalingGroup) []string {
+	strs := make([]string, 0, len(list))
+	for _, r := range list {
+		if r.Name != nil {
+			strs = append(strs, *r.Name)
+		}
+	}
+	return strs
+}
+
+func flattenBeanstalkInstances(list []*elasticbeanstalk.Instance) []string {
+	strs := make([]string, 0, len(list))
+	for _, r := range list {
+		if r.Id != nil {
+			strs = append(strs, *r.Id)
+		}
+	}
+	return strs
+}
+
+func flattenBeanstalkLc(list []*elasticbeanstalk.LaunchConfiguration) []string {
+	strs := make([]string, 0, len(list))
+	for _, r := range list {
+		if r.Name != nil {
+			strs = append(strs, *r.Name)
+		}
+	}
+	return strs
+}
+
+func flattenBeanstalkElb(list []*elasticbeanstalk.LoadBalancer) []string {
+	strs := make([]string, 0, len(list))
+	for _, r := range list {
+		if r.Name != nil {
+			strs = append(strs, *r.Name)
+		}
+	}
+	return strs
+}
+
+func flattenBeanstalkSqs(list []*elasticbeanstalk.Queue) []string {
+	strs := make([]string, 0, len(list))
+	for _, r := range list {
+		if r.URL != nil {
+			strs = append(strs, *r.URL)
+		}
+	}
+	return strs
+}
+
+func flattenBeanstalkTrigger(list []*elasticbeanstalk.Trigger) []string {
+	strs := make([]string, 0, len(list))
+	for _, r := range list {
+		if r.Name != nil {
+			strs = append(strs, *r.Name)
+		}
+	}
+	return strs
+}
+
+// There are several parts of the AWS API that will sort lists of strings,
+// causing diffs inbetweeen resources that use lists. This avoids a bit of
+// code duplication for pre-sorts that can be used for things like hash
+// functions, etc.
+func sortInterfaceSlice(in []interface{}) []interface{} {
+	a := []string{}
+	b := []interface{}{}
+	for _, v := range in {
+		a = append(a, v.(string))
+	}
+
+	sort.Strings(a)
+
+	for _, v := range a {
+		b = append(b, v)
+	}
+
+	return b
 }

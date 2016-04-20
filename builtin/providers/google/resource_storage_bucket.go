@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/schema"
 
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/storage/v1"
 )
 
@@ -23,23 +24,38 @@ func resourceStorageBucket() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 			},
-			"predefined_acl": &schema.Schema{
-				Type:       schema.TypeString,
-				Deprecated: "Please use resource \"storage_bucket_acl.predefined_acl\" instead.",
-				Optional:   true,
-				ForceNew:   true,
+
+			"force_destroy": &schema.Schema{
+				Type:     schema.TypeBool,
+				Optional: true,
+				Default:  false,
 			},
+
 			"location": &schema.Schema{
 				Type:     schema.TypeString,
 				Default:  "US",
 				Optional: true,
 				ForceNew: true,
 			},
-			"force_destroy": &schema.Schema{
-				Type:     schema.TypeBool,
-				Optional: true,
-				Default:  false,
+
+			"predefined_acl": &schema.Schema{
+				Type:       schema.TypeString,
+				Deprecated: "Please use resource \"storage_bucket_acl.predefined_acl\" instead.",
+				Optional:   true,
+				ForceNew:   true,
 			},
+
+			"project": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
+			},
+
+			"self_link": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+
 			"website": &schema.Schema{
 				Type:     schema.TypeList,
 				Optional: true,
@@ -56,16 +72,17 @@ func resourceStorageBucket() *schema.Resource {
 					},
 				},
 			},
-			"self_link": &schema.Schema{
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 		},
 	}
 }
 
 func resourceStorageBucketCreate(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
+
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
 
 	// Get the bucket and acl
 	bucket := d.Get("name").(string)
@@ -94,7 +111,7 @@ func resourceStorageBucketCreate(d *schema.ResourceData, meta interface{}) error
 		}
 	}
 
-	call := config.clientStorage.Buckets.Insert(config.Project, sb)
+	call := config.clientStorage.Buckets.Insert(project, sb)
 	if v, ok := d.GetOk("predefined_acl"); ok {
 		call = call.PredefinedAcl(v.(string))
 	}
@@ -174,8 +191,15 @@ func resourceStorageBucketRead(d *schema.ResourceData, meta interface{}) error {
 	res, err := config.clientStorage.Buckets.Get(bucket).Do()
 
 	if err != nil {
-		fmt.Printf("Error reading bucket %s: %v", bucket, err)
-		return err
+		if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 {
+			log.Printf("[WARN] Removing Bucket %q because it's gone", d.Get("name").(string))
+			// The resource doesn't exist anymore
+			d.SetId("")
+
+			return nil
+		}
+
+		return fmt.Errorf("Error reading bucket %s: %v", bucket, err)
 	}
 
 	log.Printf("[DEBUG] Read bucket %v at location %v\n\n", res.Name, res.SelfLink)

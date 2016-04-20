@@ -112,22 +112,22 @@ func TestAccAWSInstance_blockDevices(t *testing.T) {
 
 			// Check if the root block device exists.
 			if _, ok := blockDevices["/dev/sda1"]; !ok {
-				fmt.Errorf("block device doesn't exist: /dev/sda1")
+				return fmt.Errorf("block device doesn't exist: /dev/sda1")
 			}
 
 			// Check if the secondary block device exists.
 			if _, ok := blockDevices["/dev/sdb"]; !ok {
-				fmt.Errorf("block device doesn't exist: /dev/sdb")
+				return fmt.Errorf("block device doesn't exist: /dev/sdb")
 			}
 
 			// Check if the third block device exists.
 			if _, ok := blockDevices["/dev/sdc"]; !ok {
-				fmt.Errorf("block device doesn't exist: /dev/sdc")
+				return fmt.Errorf("block device doesn't exist: /dev/sdc")
 			}
 
 			// Check if the encrypted block device exists
 			if _, ok := blockDevices["/dev/sdd"]; !ok {
-				fmt.Errorf("block device doesn't exist: /dev/sdd")
+				return fmt.Errorf("block device doesn't exist: /dev/sdd")
 			}
 
 			return nil
@@ -291,6 +291,10 @@ func TestAccAWSInstance_vpc(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckInstanceExists(
 						"aws_instance.foo", &v),
+					resource.TestCheckResourceAttr(
+						"aws_instance.foo",
+						"user_data",
+						"2fad308761514d9d73c3c7fdc877607e06cf950d"),
 				),
 			},
 		},
@@ -513,6 +517,41 @@ func TestAccAWSInstance_rootBlockDeviceMismatch(t *testing.T) {
 	})
 }
 
+// This test reproduces the bug here:
+//   https://github.com/hashicorp/terraform/issues/1752
+//
+// I wish there were a way to exercise resources built with helper.Schema in a
+// unit context, in which case this test could be moved there, but for now this
+// will cover the bugfix.
+//
+// The following triggers "diffs didn't match during apply" without the fix in to
+// set NewRemoved on the .# field when it changes to 0.
+func TestAccAWSInstance_forceNewAndTagsDrift(t *testing.T) {
+	var v ec2.Instance
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckInstanceDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccInstanceConfigForceNewAndTagsDrift,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckInstanceExists("aws_instance.foo", &v),
+					driftTags(&v),
+				),
+				ExpectNonEmptyPlan: true,
+			},
+			resource.TestStep{
+				Config: testAccInstanceConfigForceNewAndTagsDrift_Update,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckInstanceExists("aws_instance.foo", &v),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckInstanceDestroy(s *terraform.State) error {
 	return testAccCheckInstanceDestroyWithProvider(s, testAccProvider)
 }
@@ -540,26 +579,25 @@ func testAccCheckInstanceDestroyWithProvider(s *terraform.State, provider *schem
 		}
 
 		// Try to find the resource
-		var err error
 		resp, err := conn.DescribeInstances(&ec2.DescribeInstancesInput{
 			InstanceIds: []*string{aws.String(rs.Primary.ID)},
 		})
 		if err == nil {
-			if len(resp.Reservations) > 0 {
-				return fmt.Errorf("still exist.")
+			for _, r := range resp.Reservations {
+				for _, i := range r.Instances {
+					if i.State != nil && *i.State.Name != "terminated" {
+						return fmt.Errorf("Found unterminated instance: %s", i)
+					}
+				}
 			}
-
-			return nil
 		}
 
 		// Verify the error is what we want
-		ec2err, ok := err.(awserr.Error)
-		if !ok {
-			return err
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == "InvalidInstanceID.NotFound" {
+			continue
 		}
-		if ec2err.Code() != "InvalidInstanceID.NotFound" {
-			return err
-		}
+
+		return err
 	}
 
 	return nil
@@ -620,6 +658,22 @@ func TestInstanceTenancySchema(t *testing.T) {
 			"Got:\n\n%#v\n\nExpected:\n\n%#v\n",
 			actualSchema,
 			expectedSchema)
+	}
+}
+
+func driftTags(instance *ec2.Instance) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		conn := testAccProvider.Meta().(*AWSClient).ec2conn
+		_, err := conn.CreateTags(&ec2.CreateTagsInput{
+			Resources: []*string{instance.InstanceId},
+			Tags: []*ec2.Tag{
+				&ec2.Tag{
+					Key:   aws.String("Drift"),
+					Value: aws.String("Happens"),
+				},
+			},
+		})
+		return err
 	}
 }
 
@@ -775,6 +829,8 @@ resource "aws_instance" "foo" {
 	subnet_id = "${aws_subnet.foo.id}"
 	associate_public_ip_address = true
 	tenancy = "dedicated"
+	# pre-encoded base64 data
+	user_data = "3dc39dda39be1205215e776bad998da361a5955d"
 }
 `
 
@@ -894,7 +950,7 @@ resource "aws_subnet" "foo" {
 resource "aws_instance" "foo_instance" {
   ami = "ami-21f78e11"
   instance_type = "t1.micro"
-  security_groups = ["${aws_security_group.tf_test_foo.id}"]
+  vpc_security_group_ids = ["${aws_security_group.tf_test_foo.id}"]
   subnet_id = "${aws_subnet.foo.id}"
   associate_public_ip_address = true
 	depends_on = ["aws_internet_gateway.gw"]
@@ -987,5 +1043,39 @@ resource "aws_instance" "foo" {
 	root_block_device {
 		volume_size = 13
 	}
+}
+`
+
+const testAccInstanceConfigForceNewAndTagsDrift = `
+resource "aws_vpc" "foo" {
+	cidr_block = "10.1.0.0/16"
+}
+
+resource "aws_subnet" "foo" {
+	cidr_block = "10.1.1.0/24"
+	vpc_id = "${aws_vpc.foo.id}"
+}
+
+resource "aws_instance" "foo" {
+	ami = "ami-22b9a343"
+	instance_type = "t2.nano"
+	subnet_id = "${aws_subnet.foo.id}"
+}
+`
+
+const testAccInstanceConfigForceNewAndTagsDrift_Update = `
+resource "aws_vpc" "foo" {
+	cidr_block = "10.1.0.0/16"
+}
+
+resource "aws_subnet" "foo" {
+	cidr_block = "10.1.1.0/24"
+	vpc_id = "${aws_vpc.foo.id}"
+}
+
+resource "aws_instance" "foo" {
+	ami = "ami-22b9a343"
+	instance_type = "t2.micro"
+	subnet_id = "${aws_subnet.foo.id}"
 }
 `

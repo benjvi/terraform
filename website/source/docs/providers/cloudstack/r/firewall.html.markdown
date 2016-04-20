@@ -14,10 +14,10 @@ Creates firewall rules for a given IP address.
 
 ```
 resource "cloudstack_firewall" "default" {
-  ipaddress = "192.168.0.1"
+  ip_address_id = "30b21801-d4b3-4174-852b-0c0f30bdbbfb"
 
   rule {
-    source_cidr = "10.0.0.0/8"
+    cidr_list = ["10.0.0.0/8"]
     protocol = "tcp"
     ports = ["80", "1000-2000"]
   }
@@ -28,8 +28,11 @@ resource "cloudstack_firewall" "default" {
 
 The following arguments are supported:
 
-* `ipaddress` - (Required) The IP address or ID for which to create the firewall
-    rules. Changing this forces a new resource to be created.
+* `ip_address_id` - (Required) The IP address ID for which to create the
+    firewall rules. Changing this forces a new resource to be created.
+
+* `ipaddress` - (Required, Deprecated) The IP address or ID for which to create
+    the firewall rules. Changing this forces a new resource to be created.
 
 * `managed` - (Optional) USE WITH CAUTION! If enabled all the firewall rules for
     this IP address will be managed by this resource. This means it will delete
@@ -38,9 +41,15 @@ The following arguments are supported:
 * `rule` - (Optional) Can be specified multiple times. Each rule block supports
     fields documented below. If `managed = false` at least one rule is required!
 
+* `parallelism` (Optional) Specifies how much rules will be created or deleted
+    concurrently. (defaults 2)
+    
 The `rule` block supports:
 
-* `source_cidr` - (Required) The source CIDR to allow access to the given ports.
+* `cidr_list` - (Required) A CIDR list to allow access to the given ports.
+
+* `source_cidr` - (Optional, Deprecated) The source CIDR to allow access to the
+    given ports. This attribute is deprecated, please use `cidr_list` instead.
 
 * `protocol` - (Required) The name of the protocol to allow. Valid options are:
     `tcp`, `udp` and `icmp`.

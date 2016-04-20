@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"testing"
 
@@ -34,9 +35,51 @@ func TestAccAWSVPCPeeringConnection_basic(t *testing.T) {
 	})
 }
 
+func TestAccAWSVPCPeeringConnection_plan(t *testing.T) {
+	var connection ec2.VpcPeeringConnection
+
+	// reach out and DELETE the VPC Peering connection outside of Terraform
+	testDestroy := func(*terraform.State) error {
+		conn := testAccProvider.Meta().(*AWSClient).ec2conn
+		log.Printf("[DEBUG] Test deleting VPC Peering connection")
+		_, err := conn.DeleteVpcPeeringConnection(
+			&ec2.DeleteVpcPeeringConnectionInput{
+				VpcPeeringConnectionId: connection.VpcPeeringConnectionId,
+			})
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheck(t)
+			if os.Getenv("AWS_ACCOUNT_ID") == "" {
+				t.Fatal("AWS_ACCOUNT_ID must be set")
+			}
+		},
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckAWSVpcPeeringConnectionDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccVpcPeeringConfig,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAWSVpcPeeringConnectionExists("aws_vpc_peering_connection.foo", &connection),
+					testDestroy,
+				),
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
 func TestAccAWSVPCPeeringConnection_tags(t *testing.T) {
 	var connection ec2.VpcPeeringConnection
 	peerId := os.Getenv("TF_PEER_ID")
+	if peerId == "" {
+		t.Skip("Error: TestAccAWSVPCPeeringConnection_tags requires a peer id to be set")
+	}
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -67,11 +110,32 @@ func testAccCheckAWSVpcPeeringConnectionDestroy(s *terraform.State) error {
 				VpcPeeringConnectionIds: []*string{aws.String(rs.Primary.ID)},
 			})
 
-		if err == nil {
-			if len(describe.VpcPeeringConnections) != 0 {
-				return fmt.Errorf("vpc peering connection still exists")
+		if err != nil {
+			return err
+		}
+
+		var pc *ec2.VpcPeeringConnection
+		for _, c := range describe.VpcPeeringConnections {
+			if rs.Primary.ID == *c.VpcPeeringConnectionId {
+				pc = c
 			}
 		}
+
+		if pc == nil {
+			// not found
+			return nil
+		}
+
+		if pc.Status != nil {
+			if *pc.Status.Code == "deleted" {
+				return nil
+			}
+			return fmt.Errorf("Found vpc peering connection in unexpected state: %s", pc)
+		}
+
+		// return error here; we've found the vpc_peering object we want, however
+		// it's not in an expected state
+		return fmt.Errorf("Fall through error for testAccCheckAWSVpcPeeringConnectionDestroy")
 	}
 
 	return nil
@@ -109,6 +173,9 @@ func testAccCheckAWSVpcPeeringConnectionExists(n string, connection *ec2.VpcPeer
 const testAccVpcPeeringConfig = `
 resource "aws_vpc" "foo" {
 		cidr_block = "10.0.0.0/16"
+		tags {
+			Name = "TestAccAWSVPCPeeringConnection_basic"
+		}
 }
 
 resource "aws_vpc" "bar" {
@@ -125,6 +192,9 @@ resource "aws_vpc_peering_connection" "foo" {
 const testAccVpcPeeringConfigTags = `
 resource "aws_vpc" "foo" {
 		cidr_block = "10.0.0.0/16"
+		tags {
+			Name = "TestAccAWSVPCPeeringConnection_tags"
+		}
 }
 
 resource "aws_vpc" "bar" {

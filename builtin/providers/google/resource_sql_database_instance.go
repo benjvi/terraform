@@ -2,9 +2,12 @@ package google
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
 
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/sqladmin/v1beta4"
 )
 
@@ -16,31 +19,12 @@ func resourceSqlDatabaseInstance() *schema.Resource {
 		Delete: resourceSqlDatabaseInstanceDelete,
 
 		Schema: map[string]*schema.Schema{
-			"name": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
-			},
-			"master_instance_name": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-				ForceNew: true,
-			},
-			"database_version": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "MYSQL_5_5",
-				ForceNew: true,
-			},
 			"region": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
-			"self_link": &schema.Schema{
-				Type:     schema.TypeString,
-				Computed: true,
-			},
+
 			"settings": &schema.Schema{
 				Type:     schema.TypeList,
 				Required: true,
@@ -166,6 +150,51 @@ func resourceSqlDatabaseInstance() *schema.Resource {
 					},
 				},
 			},
+
+			"database_version": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "MYSQL_5_5",
+				ForceNew: true,
+			},
+
+			"ip_address": &schema.Schema{
+				Type:     schema.TypeList,
+				Computed: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"ip_address": &schema.Schema{
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"time_to_retire": &schema.Schema{
+							Type:     schema.TypeString,
+							Optional: true,
+							Computed: true,
+						},
+					},
+				},
+			},
+
+			"name": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+				ForceNew: true,
+			},
+
+			"master_instance_name": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
+			},
+
+			"project": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
+			},
+
 			"replica_configuration": &schema.Schema{
 				Type:     schema.TypeList,
 				Optional: true,
@@ -224,6 +253,11 @@ func resourceSqlDatabaseInstance() *schema.Resource {
 					},
 				},
 			},
+
+			"self_link": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 		},
 	}
 }
@@ -231,7 +265,11 @@ func resourceSqlDatabaseInstance() *schema.Resource {
 func resourceSqlDatabaseInstanceCreate(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
 
-	name := d.Get("name").(string)
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
+
 	region := d.Get("region").(string)
 	databaseVersion := d.Get("database_version").(string)
 
@@ -376,10 +414,16 @@ func resourceSqlDatabaseInstanceCreate(d *schema.ResourceData, meta interface{})
 	}
 
 	instance := &sqladmin.DatabaseInstance{
-		Name:            name,
 		Region:          region,
 		Settings:        settings,
 		DatabaseVersion: databaseVersion,
+	}
+
+	if v, ok := d.GetOk("name"); ok {
+		instance.Name = v.(string)
+	} else {
+		instance.Name = resource.UniqueId()
+		d.Set("name", instance.Name)
 	}
 
 	if v, ok := d.GetOk("replica_configuration"); ok {
@@ -442,9 +486,13 @@ func resourceSqlDatabaseInstanceCreate(d *schema.ResourceData, meta interface{})
 		instance.MasterInstanceName = v.(string)
 	}
 
-	op, err := config.clientSqlAdmin.Instances.Insert(config.Project, instance).Do()
+	op, err := config.clientSqlAdmin.Instances.Insert(project, instance).Do()
 	if err != nil {
-		return fmt.Errorf("Error, failed to create instance %s: %s", name, err)
+		if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 409 {
+			return fmt.Errorf("Error, the name %s is unavailable because it was used recently", instance.Name)
+		} else {
+			return fmt.Errorf("Error, failed to create instance %s: %s", instance.Name, err)
+		}
 	}
 
 	err = sqladminOperationWait(config, op, "Create Instance")
@@ -458,10 +506,23 @@ func resourceSqlDatabaseInstanceCreate(d *schema.ResourceData, meta interface{})
 func resourceSqlDatabaseInstanceRead(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
 
-	instance, err := config.clientSqlAdmin.Instances.Get(config.Project,
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
+
+	instance, err := config.clientSqlAdmin.Instances.Get(project,
 		d.Get("name").(string)).Do()
 
 	if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 {
+			log.Printf("[WARN] Removing SQL Database %q because it's gone", d.Get("name").(string))
+			// The resource doesn't exist anymore
+			d.SetId("")
+
+			return nil
+		}
+
 		return fmt.Errorf("Error retrieving instance %s: %s",
 			d.Get("name").(string), err)
 	}
@@ -679,6 +740,19 @@ func resourceSqlDatabaseInstanceRead(d *schema.ResourceData, meta interface{}) e
 		}
 	}
 
+	_ipAddresses := make([]interface{}, len(instance.IpAddresses))
+
+	for i, ip := range instance.IpAddresses {
+		_ipAddress := make(map[string]interface{})
+
+		_ipAddress["ip_address"] = ip.IpAddress
+		_ipAddress["time_to_retire"] = ip.TimeToRetire
+
+		_ipAddresses[i] = _ipAddress
+	}
+
+	d.Set("ip_address", _ipAddresses)
+
 	if v, ok := d.GetOk("master_instance_name"); ok && v != nil {
 		d.Set("master_instance_name", instance.MasterInstanceName)
 	}
@@ -691,9 +765,15 @@ func resourceSqlDatabaseInstanceRead(d *schema.ResourceData, meta interface{}) e
 
 func resourceSqlDatabaseInstanceUpdate(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
+
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
+
 	d.Partial(true)
 
-	instance, err := config.clientSqlAdmin.Instances.Get(config.Project,
+	instance, err := config.clientSqlAdmin.Instances.Get(project,
 		d.Get("name").(string)).Do()
 
 	if err != nil {
@@ -912,7 +992,7 @@ func resourceSqlDatabaseInstanceUpdate(d *schema.ResourceData, meta interface{})
 
 	d.Partial(false)
 
-	op, err := config.clientSqlAdmin.Instances.Update(config.Project, instance.Name, instance).Do()
+	op, err := config.clientSqlAdmin.Instances.Update(project, instance.Name, instance).Do()
 	if err != nil {
 		return fmt.Errorf("Error, failed to update instance %s: %s", instance.Name, err)
 	}
@@ -928,7 +1008,12 @@ func resourceSqlDatabaseInstanceUpdate(d *schema.ResourceData, meta interface{})
 func resourceSqlDatabaseInstanceDelete(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
 
-	op, err := config.clientSqlAdmin.Instances.Delete(config.Project, d.Get("name").(string)).Do()
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
+
+	op, err := config.clientSqlAdmin.Instances.Delete(project, d.Get("name").(string)).Do()
 
 	if err != nil {
 		return fmt.Errorf("Error, failed to delete instance %s: %s", d.Get("name").(string), err)

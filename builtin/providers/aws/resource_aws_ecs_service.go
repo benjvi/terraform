@@ -51,27 +51,45 @@ func resourceAwsEcsService() *schema.Resource {
 
 			"iam_role": &schema.Schema{
 				Type:     schema.TypeString,
+				ForceNew: true,
 				Optional: true,
+			},
+
+			"deployment_maximum_percent": &schema.Schema{
+				Type:     schema.TypeInt,
+				Optional: true,
+				Default:  200,
+			},
+
+			"deployment_minimum_healthy_percent": &schema.Schema{
+				Type:     schema.TypeInt,
+				Optional: true,
+				Default:  100,
 			},
 
 			"load_balancer": &schema.Schema{
 				Type:     schema.TypeSet,
 				Optional: true,
+				ForceNew: true,
+				MaxItems: 1,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"elb_name": &schema.Schema{
 							Type:     schema.TypeString,
 							Required: true,
+							ForceNew: true,
 						},
 
 						"container_name": &schema.Schema{
 							Type:     schema.TypeString,
 							Required: true,
+							ForceNew: true,
 						},
 
 						"container_port": &schema.Schema{
 							Type:     schema.TypeInt,
 							Required: true,
+							ForceNew: true,
 						},
 					},
 				},
@@ -89,6 +107,10 @@ func resourceAwsEcsServiceCreate(d *schema.ResourceData, meta interface{}) error
 		TaskDefinition: aws.String(d.Get("task_definition").(string)),
 		DesiredCount:   aws.Int64(int64(d.Get("desired_count").(int))),
 		ClientToken:    aws.String(resource.UniqueId()),
+		DeploymentConfiguration: &ecs.DeploymentConfiguration{
+			MaximumPercent:        aws.Int64(int64(d.Get("deployment_maximum_percent").(int))),
+			MinimumHealthyPercent: aws.Int64(int64(d.Get("deployment_minimum_healthy_percent").(int))),
+		},
 	}
 
 	if v, ok := d.GetOk("cluster"); ok {
@@ -110,21 +132,21 @@ func resourceAwsEcsServiceCreate(d *schema.ResourceData, meta interface{}) error
 	// See https://github.com/hashicorp/terraform/issues/2869
 	var out *ecs.CreateServiceOutput
 	var err error
-	err = resource.Retry(2*time.Minute, func() error {
+	err = resource.Retry(2*time.Minute, func() *resource.RetryError {
 		out, err = conn.CreateService(&input)
 
 		if err != nil {
 			ec2err, ok := err.(awserr.Error)
 			if !ok {
-				return &resource.RetryError{Err: err}
+				return resource.NonRetryableError(err)
 			}
 			if ec2err.Code() == "InvalidParameterException" {
 				log.Printf("[DEBUG] Trying to create ECS service again: %q",
 					ec2err.Message())
-				return err
+				return resource.RetryableError(err)
 			}
 
-			return &resource.RetryError{Err: err}
+			return resource.NonRetryableError(err)
 		}
 
 		return nil
@@ -156,10 +178,20 @@ func resourceAwsEcsServiceRead(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	if len(out.Services) < 1 {
+		log.Printf("[DEBUG] Removing ECS service %s (%s) because it's gone", d.Get("name").(string), d.Id())
+		d.SetId("")
 		return nil
 	}
 
 	service := out.Services[0]
+
+	// Status==INACTIVE means deleted service
+	if *service.Status == "INACTIVE" {
+		log.Printf("[DEBUG] Removing ECS service %q because it's INACTIVE", *service.ServiceArn)
+		d.SetId("")
+		return nil
+	}
+
 	log.Printf("[DEBUG] Received ECS service %s", service)
 
 	d.SetId(*service.ServiceArn)
@@ -193,6 +225,11 @@ func resourceAwsEcsServiceRead(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 
+	if service.DeploymentConfiguration != nil {
+		d.Set("deployment_maximum_percent", *service.DeploymentConfiguration.MaximumPercent)
+		d.Set("deployment_minimum_healthy_percent", *service.DeploymentConfiguration.MinimumHealthyPercent)
+	}
+
 	if service.LoadBalancers != nil {
 		d.Set("load_balancers", flattenEcsLoadBalancers(service.LoadBalancers))
 	}
@@ -218,6 +255,13 @@ func resourceAwsEcsServiceUpdate(d *schema.ResourceData, meta interface{}) error
 		input.TaskDefinition = aws.String(n.(string))
 	}
 
+	if d.HasChange("deployment_maximum_percent") || d.HasChange("deployment_minimum_healthy_percent") {
+		input.DeploymentConfiguration = &ecs.DeploymentConfiguration{
+			MaximumPercent:        aws.Int64(int64(d.Get("deployment_maximum_percent").(int))),
+			MinimumHealthyPercent: aws.Int64(int64(d.Get("deployment_minimum_healthy_percent").(int))),
+		}
+	}
+
 	out, err := conn.UpdateService(&input)
 	if err != nil {
 		return err
@@ -239,6 +283,12 @@ func resourceAwsEcsServiceDelete(d *schema.ResourceData, meta interface{}) error
 	if err != nil {
 		return err
 	}
+
+	if len(resp.Services) == 0 {
+		log.Printf("[DEBUG] ECS Service %q is already gone", d.Id())
+		return nil
+	}
+
 	log.Printf("[DEBUG] ECS service %s is currently %s", d.Id(), *resp.Services[0].Status)
 
 	if *resp.Services[0].Status == "INACTIVE" {
@@ -258,13 +308,33 @@ func resourceAwsEcsServiceDelete(d *schema.ResourceData, meta interface{}) error
 		}
 	}
 
-	input := ecs.DeleteServiceInput{
-		Service: aws.String(d.Id()),
-		Cluster: aws.String(d.Get("cluster").(string)),
-	}
+	// Wait until the ECS service is drained
+	err = resource.Retry(5*time.Minute, func() *resource.RetryError {
+		input := ecs.DeleteServiceInput{
+			Service: aws.String(d.Id()),
+			Cluster: aws.String(d.Get("cluster").(string)),
+		}
 
-	log.Printf("[DEBUG] Deleting ECS service %s", input)
-	out, err := conn.DeleteService(&input)
+		log.Printf("[DEBUG] Trying to delete ECS service %s", input)
+		_, err := conn.DeleteService(&input)
+		if err == nil {
+			return nil
+		}
+
+		ec2err, ok := err.(awserr.Error)
+		if !ok {
+			return resource.NonRetryableError(err)
+		}
+		if ec2err.Code() == "InvalidParameterException" {
+			// Prevent "The service cannot be stopped while deployments are active."
+			log.Printf("[DEBUG] Trying to delete ECS service again: %q",
+				ec2err.Message())
+			return resource.RetryableError(err)
+		}
+
+		return resource.NonRetryableError(err)
+
+	})
 	if err != nil {
 		return err
 	}
@@ -272,7 +342,7 @@ func resourceAwsEcsServiceDelete(d *schema.ResourceData, meta interface{}) error
 	// Wait until it's deleted
 	wait := resource.StateChangeConf{
 		Pending:    []string{"DRAINING"},
-		Target:     "INACTIVE",
+		Target:     []string{"INACTIVE"},
 		Timeout:    5 * time.Minute,
 		MinTimeout: 1 * time.Second,
 		Refresh: func() (interface{}, string, error) {
@@ -285,6 +355,7 @@ func resourceAwsEcsServiceDelete(d *schema.ResourceData, meta interface{}) error
 				return resp, "FAILED", err
 			}
 
+			log.Printf("[DEBUG] ECS service (%s) is currently %q", d.Id(), *resp.Services[0].Status)
 			return resp, *resp.Services[0].Status, nil
 		},
 	}
@@ -294,7 +365,7 @@ func resourceAwsEcsServiceDelete(d *schema.ResourceData, meta interface{}) error
 		return err
 	}
 
-	log.Printf("[DEBUG] ECS service %s deleted.", *out.Service.ServiceArn)
+	log.Printf("[DEBUG] ECS service %s deleted.", d.Id())
 	return nil
 }
 

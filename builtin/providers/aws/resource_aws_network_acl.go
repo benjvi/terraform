@@ -50,6 +50,7 @@ func resourceAwsNetworkAcl() *schema.Resource {
 				Type:     schema.TypeSet,
 				Required: false,
 				Optional: true,
+				Computed: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"from_port": &schema.Schema{
@@ -92,6 +93,7 @@ func resourceAwsNetworkAcl() *schema.Resource {
 				Type:     schema.TypeSet,
 				Required: false,
 				Optional: true,
+				Computed: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"from_port": &schema.Schema{
@@ -167,6 +169,13 @@ func resourceAwsNetworkAclRead(d *schema.ResourceData, meta interface{}) error {
 	})
 
 	if err != nil {
+		if ec2err, ok := err.(awserr.Error); ok {
+			if ec2err.Code() == "InvalidNetworkAclID.NotFound" {
+				log.Printf("[DEBUG] Network ACL (%s) not found", d.Id())
+				d.SetId("")
+				return nil
+			}
+		}
 		return err
 	}
 	if resp == nil {
@@ -181,7 +190,7 @@ func resourceAwsNetworkAclRead(d *schema.ResourceData, meta interface{}) error {
 	for _, e := range networkAcl.Entries {
 		// Skip the default rules added by AWS. They can be neither
 		// configured or deleted by users.
-		if *e.RuleNumber == 32767 {
+		if *e.RuleNumber == awsDefaultAclRuleNumber {
 			continue
 		}
 
@@ -315,88 +324,89 @@ func resourceAwsNetworkAclUpdate(d *schema.ResourceData, meta interface{}) error
 }
 
 func updateNetworkAclEntries(d *schema.ResourceData, entryType string, conn *ec2.EC2) error {
+	if d.HasChange(entryType) {
+		o, n := d.GetChange(entryType)
 
-	o, n := d.GetChange(entryType)
-
-	if o == nil {
-		o = new(schema.Set)
-	}
-	if n == nil {
-		n = new(schema.Set)
-	}
-
-	os := o.(*schema.Set)
-	ns := n.(*schema.Set)
-
-	toBeDeleted, err := expandNetworkAclEntries(os.Difference(ns).List(), entryType)
-	if err != nil {
-		return err
-	}
-	for _, remove := range toBeDeleted {
-
-		// AWS includes default rules with all network ACLs that can be
-		// neither modified nor destroyed. They have a custom rule
-		// number that is out of bounds for any other rule. If we
-		// encounter it, just continue. There's no work to be done.
-		if *remove.RuleNumber == 32767 {
-			continue
+		if o == nil {
+			o = new(schema.Set)
+		}
+		if n == nil {
+			n = new(schema.Set)
 		}
 
-		// Delete old Acl
-		_, err := conn.DeleteNetworkAclEntry(&ec2.DeleteNetworkAclEntryInput{
-			NetworkAclId: aws.String(d.Id()),
-			RuleNumber:   remove.RuleNumber,
-			Egress:       remove.Egress,
-		})
+		os := o.(*schema.Set)
+		ns := n.(*schema.Set)
+
+		toBeDeleted, err := expandNetworkAclEntries(os.Difference(ns).List(), entryType)
 		if err != nil {
-			return fmt.Errorf("Error deleting %s entry: %s", entryType, err)
-		}
-	}
-
-	toBeCreated, err := expandNetworkAclEntries(ns.Difference(os).List(), entryType)
-	if err != nil {
-		return err
-	}
-	for _, add := range toBeCreated {
-		// Protocol -1 rules don't store ports in AWS. Thus, they'll always
-		// hash differently when being read out of the API. Force the user
-		// to set from_port and to_port to 0 for these rules, to keep the
-		// hashing consistent.
-		if *add.Protocol == "-1" {
-			to := *add.PortRange.To
-			from := *add.PortRange.From
-			expected := &expectedPortPair{
-				to_port:   0,
-				from_port: 0,
-			}
-			if ok := validatePorts(to, from, *expected); !ok {
-				return fmt.Errorf(
-					"to_port (%d) and from_port (%d) must both be 0 to use the the 'all' \"-1\" protocol!",
-					to, from)
-			}
-		}
-
-		// AWS mutates the CIDR block into a network implied by the IP and
-		// mask provided. This results in hashing inconsistencies between
-		// the local config file and the state returned by the API. Error
-		// if the user provides a CIDR block with an inappropriate mask
-		if err := validateCIDRBlock(*add.CidrBlock); err != nil {
 			return err
 		}
+		for _, remove := range toBeDeleted {
+			// AWS includes default rules with all network ACLs that can be
+			// neither modified nor destroyed. They have a custom rule
+			// number that is out of bounds for any other rule. If we
+			// encounter it, just continue. There's no work to be done.
+			if *remove.RuleNumber == awsDefaultAclRuleNumber {
+				continue
+			}
 
-		// Add new Acl entry
-		_, connErr := conn.CreateNetworkAclEntry(&ec2.CreateNetworkAclEntryInput{
-			NetworkAclId: aws.String(d.Id()),
-			CidrBlock:    add.CidrBlock,
-			Egress:       add.Egress,
-			PortRange:    add.PortRange,
-			Protocol:     add.Protocol,
-			RuleAction:   add.RuleAction,
-			RuleNumber:   add.RuleNumber,
-			IcmpTypeCode: add.IcmpTypeCode,
-		})
-		if connErr != nil {
-			return fmt.Errorf("Error creating %s entry: %s", entryType, connErr)
+			// Delete old Acl
+			log.Printf("[DEBUG] Destroying Network ACL Entry number (%d)", int(*remove.RuleNumber))
+			_, err := conn.DeleteNetworkAclEntry(&ec2.DeleteNetworkAclEntryInput{
+				NetworkAclId: aws.String(d.Id()),
+				RuleNumber:   remove.RuleNumber,
+				Egress:       remove.Egress,
+			})
+			if err != nil {
+				return fmt.Errorf("Error deleting %s entry: %s", entryType, err)
+			}
+		}
+
+		toBeCreated, err := expandNetworkAclEntries(ns.Difference(os).List(), entryType)
+		if err != nil {
+			return err
+		}
+		for _, add := range toBeCreated {
+			// Protocol -1 rules don't store ports in AWS. Thus, they'll always
+			// hash differently when being read out of the API. Force the user
+			// to set from_port and to_port to 0 for these rules, to keep the
+			// hashing consistent.
+			if *add.Protocol == "-1" {
+				to := *add.PortRange.To
+				from := *add.PortRange.From
+				expected := &expectedPortPair{
+					to_port:   0,
+					from_port: 0,
+				}
+				if ok := validatePorts(to, from, *expected); !ok {
+					return fmt.Errorf(
+						"to_port (%d) and from_port (%d) must both be 0 to use the the 'all' \"-1\" protocol!",
+						to, from)
+				}
+			}
+
+			// AWS mutates the CIDR block into a network implied by the IP and
+			// mask provided. This results in hashing inconsistencies between
+			// the local config file and the state returned by the API. Error
+			// if the user provides a CIDR block with an inappropriate mask
+			if err := validateCIDRBlock(*add.CidrBlock); err != nil {
+				return err
+			}
+
+			// Add new Acl entry
+			_, connErr := conn.CreateNetworkAclEntry(&ec2.CreateNetworkAclEntryInput{
+				NetworkAclId: aws.String(d.Id()),
+				CidrBlock:    add.CidrBlock,
+				Egress:       add.Egress,
+				PortRange:    add.PortRange,
+				Protocol:     add.Protocol,
+				RuleAction:   add.RuleAction,
+				RuleNumber:   add.RuleNumber,
+				IcmpTypeCode: add.IcmpTypeCode,
+			})
+			if connErr != nil {
+				return fmt.Errorf("Error creating %s entry: %s", entryType, connErr)
+			}
 		}
 	}
 	return nil
@@ -406,7 +416,7 @@ func resourceAwsNetworkAclDelete(d *schema.ResourceData, meta interface{}) error
 	conn := meta.(*AWSClient).ec2conn
 
 	log.Printf("[INFO] Deleting Network Acl: %s", d.Id())
-	return resource.Retry(5*time.Minute, func() error {
+	retryErr := resource.Retry(5*time.Minute, func() *resource.RetryError {
 		_, err := conn.DeleteNetworkAcl(&ec2.DeleteNetworkAclInput{
 			NetworkAclId: aws.String(d.Id()),
 		})
@@ -423,7 +433,7 @@ func resourceAwsNetworkAclDelete(d *schema.ResourceData, meta interface{}) error
 
 					a, err := findNetworkAclAssociation(v.(string), conn)
 					if err != nil {
-						return resource.RetryError{Err: fmt.Errorf("Dependency violation: Cannot find ACL %s: %s", d.Id(), err)}
+						return resource.NonRetryableError(err)
 					}
 					associations = append(associations, a)
 				} else if v, ok := d.GetOk("subnet_ids"); ok {
@@ -431,31 +441,42 @@ func resourceAwsNetworkAclDelete(d *schema.ResourceData, meta interface{}) error
 					for _, i := range ids {
 						a, err := findNetworkAclAssociation(i.(string), conn)
 						if err != nil {
-							return resource.RetryError{Err: fmt.Errorf("Dependency violation: Cannot delete acl %s: %s", d.Id(), err)}
+							return resource.NonRetryableError(err)
 						}
 						associations = append(associations, a)
 					}
 				}
+
+				log.Printf("[DEBUG] Replacing network associations for Network ACL (%s): %s", d.Id(), associations)
 				defaultAcl, err := getDefaultNetworkAcl(d.Get("vpc_id").(string), conn)
 				if err != nil {
-					return resource.RetryError{Err: fmt.Errorf("Dependency violation: Cannot delete acl %s: %s", d.Id(), err)}
+					return resource.NonRetryableError(err)
 				}
 
 				for _, a := range associations {
-					_, err = conn.ReplaceNetworkAclAssociation(&ec2.ReplaceNetworkAclAssociationInput{
+					_, replaceErr := conn.ReplaceNetworkAclAssociation(&ec2.ReplaceNetworkAclAssociationInput{
 						AssociationId: a.NetworkAclAssociationId,
 						NetworkAclId:  defaultAcl.NetworkAclId,
 					})
+					if replaceErr != nil {
+						log.Printf("[ERR] Non retryable error in replacing associtions for Network ACL (%s): %s", d.Id(), replaceErr)
+						return resource.NonRetryableError(replaceErr)
+					}
 				}
-				return resource.RetryError{Err: err}
+				return resource.RetryableError(fmt.Errorf("Dependencies found and cleaned up, retrying"))
 			default:
 				// Any other error, we want to quit the retry loop immediately
-				return resource.RetryError{Err: err}
+				return resource.NonRetryableError(err)
 			}
 		}
 		log.Printf("[Info] Deleted network ACL %s successfully", d.Id())
 		return nil
 	})
+
+	if retryErr != nil {
+		return fmt.Errorf("[ERR] Error destroying Network ACL (%s): %s", d.Id(), retryErr)
+	}
+	return nil
 }
 
 func resourceAwsNetworkAclEntryHash(v interface{}) int {

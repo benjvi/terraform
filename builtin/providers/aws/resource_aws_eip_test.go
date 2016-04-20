@@ -78,6 +78,29 @@ func TestAccAWSEIP_network_interface(t *testing.T) {
 	})
 }
 
+func TestAccAWSEIP_twoEIPsOneNetworkInterface(t *testing.T) {
+	var one, two ec2.Address
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckAWSEIPDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccAWSEIPMultiNetworkInterfaceConfig,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAWSEIPExists("aws_eip.one", &one),
+					testAccCheckAWSEIPAttributes(&one),
+					testAccCheckAWSEIPAssociated(&one),
+					testAccCheckAWSEIPExists("aws_eip.two", &two),
+					testAccCheckAWSEIPAttributes(&two),
+					testAccCheckAWSEIPAssociated(&two),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckAWSEIPDestroy(s *terraform.State) error {
 	conn := testAccProvider.Meta().(*AWSClient).ec2conn
 
@@ -86,26 +109,38 @@ func testAccCheckAWSEIPDestroy(s *terraform.State) error {
 			continue
 		}
 
-		req := &ec2.DescribeAddressesInput{
-			PublicIps: []*string{aws.String(rs.Primary.ID)},
-		}
-		describe, err := conn.DescribeAddresses(req)
-
-		if err == nil {
-			if len(describe.Addresses) != 0 &&
-				*describe.Addresses[0].PublicIp == rs.Primary.ID {
-				return fmt.Errorf("EIP still exists")
+		if strings.Contains(rs.Primary.ID, "eipalloc") {
+			req := &ec2.DescribeAddressesInput{
+				AllocationIds: []*string{aws.String(rs.Primary.ID)},
 			}
-		}
+			describe, err := conn.DescribeAddresses(req)
+			if err != nil {
+				// Verify the error is what we want
+				if ae, ok := err.(awserr.Error); ok && ae.Code() == "InvalidAllocationID.NotFound" {
+					continue
+				}
+				return err
+			}
 
-		// Verify the error
-		providerErr, ok := err.(awserr.Error)
-		if !ok {
-			return err
-		}
+			if len(describe.Addresses) > 0 {
+				return fmt.Errorf("still exists")
+			}
+		} else {
+			req := &ec2.DescribeAddressesInput{
+				PublicIps: []*string{aws.String(rs.Primary.ID)},
+			}
+			describe, err := conn.DescribeAddresses(req)
+			if err != nil {
+				// Verify the error is what we want
+				if ae, ok := err.(awserr.Error); ok && ae.Code() == "InvalidAllocationID.NotFound" {
+					continue
+				}
+				return err
+			}
 
-		if providerErr.Code() != "InvalidAllocationID.NotFound" {
-			return fmt.Errorf("Unexpected error: %s", err)
+			if len(describe.Addresses) > 0 {
+				return fmt.Errorf("still exists")
+			}
 		}
 	}
 
@@ -124,7 +159,7 @@ func testAccCheckAWSEIPAttributes(conf *ec2.Address) resource.TestCheckFunc {
 
 func testAccCheckAWSEIPAssociated(conf *ec2.Address) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		if *conf.AssociationId == "" {
+		if conf.AssociationId == nil || *conf.AssociationId == "" {
 			return fmt.Errorf("empty association_id")
 		}
 
@@ -208,6 +243,7 @@ resource "aws_eip" "bar" {
 	instance = "${aws_instance.bar.id}"
 }
 `
+
 const testAccAWSEIPNetworkInterfaceConfig = `
 resource "aws_vpc" "bar" {
 	cidr_block = "10.0.0.0/24"
@@ -228,5 +264,34 @@ resource "aws_network_interface" "bar" {
 resource "aws_eip" "bar" {
 	vpc = "true"
 	network_interface = "${aws_network_interface.bar.id}"
+}
+`
+
+const testAccAWSEIPMultiNetworkInterfaceConfig = `
+resource "aws_vpc" "bar" {
+	cidr_block = "10.0.0.0/24"
+}
+resource "aws_internet_gateway" "bar" {
+	vpc_id = "${aws_vpc.bar.id}"
+}
+resource "aws_subnet" "bar" {
+  vpc_id            = "${aws_vpc.bar.id}"
+  availability_zone = "us-west-2a"
+  cidr_block        = "10.0.0.0/24"
+}
+resource "aws_network_interface" "bar" {
+  subnet_id       = "${aws_subnet.bar.id}"
+	private_ips     = ["10.0.0.10", "10.0.0.11"]
+  security_groups = [ "${aws_vpc.bar.default_security_group_id}" ]
+}
+resource "aws_eip" "one" {
+	vpc               = "true"
+	network_interface = "${aws_network_interface.bar.id}"
+	private_ip        = "10.0.0.10"
+}
+resource "aws_eip" "two" {
+	vpc               = "true"
+	network_interface = "${aws_network_interface.bar.id}"
+	private_ip        = "10.0.0.11"
 }
 `

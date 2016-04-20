@@ -129,7 +129,7 @@ func resourceAwsVpnGatewayDelete(d *schema.ResourceData, meta interface{}) error
 
 	log.Printf("[INFO] Deleting VPN gateway: %s", d.Id())
 
-	return resource.Retry(5*time.Minute, func() error {
+	return resource.Retry(5*time.Minute, func() *resource.RetryError {
 		_, err := conn.DeleteVpnGateway(&ec2.DeleteVpnGatewayInput{
 			VpnGatewayId: aws.String(d.Id()),
 		})
@@ -139,17 +139,17 @@ func resourceAwsVpnGatewayDelete(d *schema.ResourceData, meta interface{}) error
 
 		ec2err, ok := err.(awserr.Error)
 		if !ok {
-			return err
+			return resource.RetryableError(err)
 		}
 
 		switch ec2err.Code() {
 		case "InvalidVpnGatewayID.NotFound":
 			return nil
 		case "IncorrectState":
-			return err // retry
+			return resource.RetryableError(err)
 		}
 
-		return resource.RetryError{Err: err}
+		return resource.NonRetryableError(err)
 	})
 }
 
@@ -168,24 +168,34 @@ func resourceAwsVpnGatewayAttach(d *schema.ResourceData, meta interface{}) error
 		d.Id(),
 		d.Get("vpc_id").(string))
 
-	_, err := conn.AttachVpnGateway(&ec2.AttachVpnGatewayInput{
+	req := &ec2.AttachVpnGatewayInput{
 		VpnGatewayId: aws.String(d.Id()),
 		VpcId:        aws.String(d.Get("vpc_id").(string)),
+	}
+
+	err := resource.Retry(30*time.Second, func() *resource.RetryError {
+		_, err := conn.AttachVpnGateway(req)
+		if err != nil {
+			if ec2err, ok := err.(awserr.Error); ok {
+				if "InvalidVpnGatewayID.NotFound" == ec2err.Code() {
+					return resource.RetryableError(
+						fmt.Errorf("Gateway not found, retry for eventual consistancy"))
+				}
+			}
+			return resource.NonRetryableError(err)
+		}
+		return nil
 	})
+
 	if err != nil {
 		return err
 	}
-
-	// A note on the states below: the AWS docs (as of July, 2014) say
-	// that the states would be: attached, attaching, detached, detaching,
-	// but when running, I noticed that the state is usually "available" when
-	// it is attached.
 
 	// Wait for it to be fully attached before continuing
 	log.Printf("[DEBUG] Waiting for VPN gateway (%s) to attach", d.Id())
 	stateConf := &resource.StateChangeConf{
 		Pending: []string{"detached", "attaching"},
-		Target:  "available",
+		Target:  []string{"attached"},
 		Refresh: vpnGatewayAttachStateRefreshFunc(conn, d.Id(), "available"),
 		Timeout: 1 * time.Minute,
 	}
@@ -246,7 +256,7 @@ func resourceAwsVpnGatewayDetach(d *schema.ResourceData, meta interface{}) error
 	log.Printf("[DEBUG] Waiting for VPN gateway (%s) to detach", d.Id())
 	stateConf := &resource.StateChangeConf{
 		Pending: []string{"attached", "detaching", "available"},
-		Target:  "detached",
+		Target:  []string{"detached"},
 		Refresh: vpnGatewayAttachStateRefreshFunc(conn, d.Id(), "detached"),
 		Timeout: 1 * time.Minute,
 	}
@@ -271,6 +281,7 @@ func vpnGatewayAttachStateRefreshFunc(conn *ec2.EC2, id string, expected string)
 		resp, err := conn.DescribeVpnGateways(&ec2.DescribeVpnGatewaysInput{
 			VpnGatewayIds: []*string{aws.String(id)},
 		})
+
 		if err != nil {
 			if ec2err, ok := err.(awserr.Error); ok && ec2err.Code() == "InvalidVpnGatewayID.NotFound" {
 				resp = nil
@@ -287,10 +298,6 @@ func vpnGatewayAttachStateRefreshFunc(conn *ec2.EC2, id string, expected string)
 		}
 
 		vpnGateway := resp.VpnGateways[0]
-
-		if time.Now().Sub(start) > 10*time.Second {
-			return vpnGateway, expected, nil
-		}
 
 		if len(vpnGateway.VpcAttachments) == 0 {
 			// No attachments, we're detached

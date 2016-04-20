@@ -23,7 +23,7 @@ resource "aws_iam_role" "role" {
     path = "/"
     assume_role_policy = <<EOF
 {
-    "Version": "2008-10-17",
+    "Version": "2012-10-17",
     "Statement": [
         {
             "Action": "sts:AssumeRole",
@@ -55,4 +55,4 @@ The following arguments are supported:
 * `roles` - The list of roles assigned to the instance profile.
 * `unique_id` - The [unique ID][1] assigned by AWS.
 
-  [1]: http://docs.aws.amazon.com/IAM/latest/UserGuide/Using_Identifiers.html#GUIDs
+  [1]: https://docs.aws.amazon.com/IAM/latest/UserGuide/Using_Identifiers.html#GUIDs

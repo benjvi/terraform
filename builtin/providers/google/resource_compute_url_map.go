@@ -2,10 +2,12 @@ package google
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/hashicorp/terraform/helper/schema"
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 )
 
 func resourceComputeUrlMap() *schema.Resource {
@@ -16,20 +18,15 @@ func resourceComputeUrlMap() *schema.Resource {
 		Delete: resourceComputeUrlMapDelete,
 
 		Schema: map[string]*schema.Schema{
+			"default_service": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+			},
+
 			"name": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
-			},
-
-			"id": &schema.Schema{
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-
-			"default_service": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
 			},
 
 			"description": &schema.Schema{
@@ -64,6 +61,11 @@ func resourceComputeUrlMap() *schema.Resource {
 						},
 					},
 				},
+			},
+
+			"id": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 
 			"path_matcher": &schema.Schema{
@@ -106,6 +108,12 @@ func resourceComputeUrlMap() *schema.Resource {
 						},
 					},
 				},
+			},
+
+			"project": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
 			},
 
 			"self_link": &schema.Schema{
@@ -233,6 +241,11 @@ func createUrlMapTest(v interface{}) *compute.UrlMapTest {
 func resourceComputeUrlMapCreate(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
 
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
+
 	name := d.Get("name").(string)
 	defaultService := d.Get("default_service").(string)
 
@@ -269,7 +282,7 @@ func resourceComputeUrlMapCreate(d *schema.ResourceData, meta interface{}) error
 		urlMap.Tests[i] = createUrlMapTest(v)
 	}
 
-	op, err := config.clientCompute.UrlMaps.Insert(config.Project, urlMap).Do()
+	op, err := config.clientCompute.UrlMaps.Insert(project, urlMap).Do()
 
 	if err != nil {
 		return fmt.Errorf("Error, failed to insert Url Map %s: %s", name, err)
@@ -287,11 +300,24 @@ func resourceComputeUrlMapCreate(d *schema.ResourceData, meta interface{}) error
 func resourceComputeUrlMapRead(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
 
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
+
 	name := d.Get("name").(string)
 
-	urlMap, err := config.clientCompute.UrlMaps.Get(config.Project, name).Do()
+	urlMap, err := config.clientCompute.UrlMaps.Get(project, name).Do()
 
 	if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 {
+			log.Printf("[WARN] Removing URL Map %q because it's gone", d.Get("name").(string))
+			// The resource doesn't exist anymore
+			d.SetId("")
+
+			return nil
+		}
+
 		return fmt.Errorf("Error, failed to get Url Map %s: %s", name, err)
 	}
 
@@ -415,8 +441,13 @@ func resourceComputeUrlMapRead(d *schema.ResourceData, meta interface{}) error {
 func resourceComputeUrlMapUpdate(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
 
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
+
 	name := d.Get("name").(string)
-	urlMap, err := config.clientCompute.UrlMaps.Get(config.Project, name).Do()
+	urlMap, err := config.clientCompute.UrlMaps.Get(project, name).Do()
 	if err != nil {
 		return fmt.Errorf("Error, failed to get Url Map %s: %s", name, err)
 	}
@@ -614,7 +645,7 @@ func resourceComputeUrlMapUpdate(d *schema.ResourceData, meta interface{}) error
 		urlMap.Tests = newTests
 	}
 
-	op, err := config.clientCompute.UrlMaps.Update(config.Project, urlMap.Name, urlMap).Do()
+	op, err := config.clientCompute.UrlMaps.Update(project, urlMap.Name, urlMap).Do()
 
 	if err != nil {
 		return fmt.Errorf("Error, failed to update Url Map %s: %s", name, err)
@@ -631,9 +662,15 @@ func resourceComputeUrlMapUpdate(d *schema.ResourceData, meta interface{}) error
 
 func resourceComputeUrlMapDelete(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
+
+	project, err := getProject(d, config)
+	if err != nil {
+		return err
+	}
+
 	name := d.Get("name").(string)
 
-	op, err := config.clientCompute.UrlMaps.Delete(config.Project, name).Do()
+	op, err := config.clientCompute.UrlMaps.Delete(project, name).Do()
 
 	if err != nil {
 		return fmt.Errorf("Error, failed to delete Url Map %s: %s", name, err)

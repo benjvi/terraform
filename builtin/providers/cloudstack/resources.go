@@ -4,14 +4,18 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/benjvi/go-cloudstack/cloudstack43"
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
-// CloudStack uses a "special" ID of -1 to define an unlimited resource
+// UnlimitedResourceID is a "special" ID to define an unlimited resource
 const UnlimitedResourceID = "-1"
+
+// Define a regexp for parsing the port
+var splitPorts = regexp.MustCompile(`^(\d+)(?:-(\d+))?$`)
 
 type retrieveError struct {
 	name  string
@@ -65,7 +69,7 @@ func retrieveID(cs *cloudstack43.CloudStackClient, name, value string) (id strin
 		id, err = cs.Network.GetNetworkID(value)
 	case "zone":
 		id, err = cs.Zone.GetZoneID(value)
-	case "ipaddress":
+	case "ip_address":
 		p := cs.Address.NewListPublicIpAddressesParams()
 		p.SetIpaddress(value)
 		l, e := cs.Address.ListPublicIpAddresses(p)
@@ -136,7 +140,7 @@ func Retry(n int, f RetryFunc) (interface{}, error) {
 	for i := 0; i < n; i++ {
 		r, err := f()
 		if err == nil {
-			return r, nil
+			return r, err
 		}
 
 		lastErr = err
@@ -144,4 +148,54 @@ func Retry(n int, f RetryFunc) (interface{}, error) {
 	}
 
 	return nil, lastErr
+}
+
+// This is a temporary helper function to support both the new
+// cidr_list and the deprecated source_cidr parameter
+func retrieveCidrList(rule map[string]interface{}) []string {
+	sourceCidr := rule["source_cidr"].(string)
+	if sourceCidr != "" {
+		return []string{sourceCidr}
+	}
+
+	var cidrList []string
+	for _, cidr := range rule["cidr_list"].(*schema.Set).List() {
+		cidrList = append(cidrList, cidr.(string))
+	}
+
+	return cidrList
+}
+
+// This is a temporary helper function to support both the new
+// cidr_list and the deprecated source_cidr parameter
+func setCidrList(rule map[string]interface{}, cidrList string) {
+	sourceCidr := rule["source_cidr"].(string)
+	if sourceCidr != "" {
+		rule["source_cidr"] = cidrList
+		return
+	}
+
+	cidrs := &schema.Set{F: schema.HashString}
+	for _, cidr := range strings.Split(cidrList, ",") {
+		cidrs.Add(cidr)
+	}
+
+	rule["cidr_list"] = cidrs
+}
+
+type projectidSetter interface {
+	SetProjectid(string)
+}
+
+// If there is a project supplied, we retrieve and set the project id
+func setProjectid(p projectidSetter, cs *cloudstack43.CloudStackClient, d *schema.ResourceData) error {
+	if project, ok := d.GetOk("project"); ok {
+		projectid, e := retrieveID(cs, "project", project.(string))
+		if e != nil {
+			return e.Error()
+		}
+		p.SetProjectid(projectid)
+	}
+
+	return nil
 }

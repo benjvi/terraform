@@ -160,8 +160,6 @@ func resourceNetAPIPrivateDirectConnectCreate(d *schema.ResourceData, meta inter
 			return fmt.Errorf("Timeout while waiting for private direct connect to become ready")
 		}
 	}
-
-	return resourceNetAPIPrivateDirectConnectRead(d, meta)
 }
 
 func resourceNetAPIPrivateDirectConnectRead(d *schema.ResourceData, meta interface{}) error {
@@ -250,8 +248,6 @@ func resourceNetAPIPrivateDirectConnectUpdate(d *schema.ResourceData, meta inter
 			return fmt.Errorf("Timeout while waiting for private direct connect to become ready")
 		}
 	}
-
-	return resourceNetAPIPrivateDirectConnectRead(d, meta)
 }
 
 func resourceNetAPIPrivateDirectConnectDelete(d *schema.ResourceData, meta interface{}) error {

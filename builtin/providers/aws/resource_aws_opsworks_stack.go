@@ -225,15 +225,12 @@ func resourceAwsOpsworksSetStackCustomCookbooksSource(d *schema.ResourceData, v 
 		if v.Username != nil {
 			m["username"] = *v.Username
 		}
-		if v.Password != nil {
-			m["password"] = *v.Password
-		}
 		if v.Revision != nil {
 			m["revision"] = *v.Revision
 		}
-		if v.SshKey != nil {
-			m["ssh_key"] = *v.SshKey
-		}
+		// v.Password will, on read, contain the placeholder string
+		// "*****FILTERED*****", so we ignore it on read and let persist
+		// the value already in the state.
 		nv = append(nv, m)
 	}
 
@@ -259,6 +256,7 @@ func resourceAwsOpsworksStackRead(d *schema.ResourceData, meta interface{}) erro
 	if err != nil {
 		if awserr, ok := err.(awserr.Error); ok {
 			if awserr.Code() == "ResourceNotFoundException" {
+				log.Printf("[DEBUG] OpsWorks stack (%s) not found", d.Id())
 				d.SetId("")
 				return nil
 			}
@@ -306,9 +304,11 @@ func resourceAwsOpsworksStackCreate(d *schema.ResourceData, meta interface{}) er
 
 	req := &opsworks.CreateStackInput{
 		DefaultInstanceProfileArn: aws.String(d.Get("default_instance_profile_arn").(string)),
-		Name:           aws.String(d.Get("name").(string)),
-		Region:         aws.String(d.Get("region").(string)),
-		ServiceRoleArn: aws.String(d.Get("service_role_arn").(string)),
+		Name:                      aws.String(d.Get("name").(string)),
+		Region:                    aws.String(d.Get("region").(string)),
+		ServiceRoleArn:            aws.String(d.Get("service_role_arn").(string)),
+		DefaultOs:                 aws.String(d.Get("default_os").(string)),
+		UseOpsworksSecurityGroups: aws.Bool(d.Get("use_opsworks_security_groups").(bool)),
 	}
 	inVpc := false
 	if vpcId, ok := d.GetOk("vpc_id"); ok {
@@ -322,10 +322,10 @@ func resourceAwsOpsworksStackCreate(d *schema.ResourceData, meta interface{}) er
 		req.DefaultAvailabilityZone = aws.String(defaultAvailabilityZone.(string))
 	}
 
-	log.Printf("[DEBUG] Creating OpsWorks stack: %s", *req.Name)
+	log.Printf("[DEBUG] Creating OpsWorks stack: %s", req)
 
 	var resp *opsworks.CreateStackOutput
-	err = resource.Retry(20*time.Minute, func() error {
+	err = resource.Retry(20*time.Minute, func() *resource.RetryError {
 		var cerr error
 		resp, cerr = client.CreateStack(req)
 		if cerr != nil {
@@ -339,12 +339,15 @@ func resourceAwsOpsworksStackCreate(d *schema.ResourceData, meta interface{}) er
 				// The full error we're looking for looks something like
 				// the following:
 				// Service Role Arn: [...] is not yet propagated, please try again in a couple of minutes
-				if opserr.Code() == "ValidationException" && strings.Contains(opserr.Message(), "not yet propagated") {
+				propErr := "not yet propagated"
+				trustErr := "not the necessary trust relationship"
+				validateErr := "validate IAM role permission"
+				if opserr.Code() == "ValidationException" && (strings.Contains(opserr.Message(), trustErr) || strings.Contains(opserr.Message(), propErr) || strings.Contains(opserr.Message(), validateErr)) {
 					log.Printf("[INFO] Waiting for service IAM role to propagate")
-					return cerr
+					return resource.RetryableError(cerr)
 				}
 			}
-			return resource.RetryError{Err: cerr}
+			return resource.NonRetryableError(cerr)
 		}
 		return nil
 	})
@@ -356,7 +359,7 @@ func resourceAwsOpsworksStackCreate(d *schema.ResourceData, meta interface{}) er
 	d.SetId(stackId)
 	d.Set("id", stackId)
 
-	if inVpc {
+	if inVpc && *req.UseOpsworksSecurityGroups {
 		// For VPC-based stacks, OpsWorks asynchronously creates some default
 		// security groups which must exist before layers can be created.
 		// Unfortunately it doesn't tell us what the ids of these are, so
@@ -414,7 +417,7 @@ func resourceAwsOpsworksStackUpdate(d *schema.ResourceData, meta interface{}) er
 		Version: aws.String(d.Get("configuration_manager_version").(string)),
 	}
 
-	log.Printf("[DEBUG] Updating OpsWorks stack: %s", d.Id())
+	log.Printf("[DEBUG] Updating OpsWorks stack: %s", req)
 
 	_, err = client.UpdateStack(req)
 	if err != nil {
@@ -447,7 +450,10 @@ func resourceAwsOpsworksStackDelete(d *schema.ResourceData, meta interface{}) er
 	// wait for the security groups to be deleted.
 	// There is no robust way to check for this, so we'll just wait a
 	// nominal amount of time.
-	if _, ok := d.GetOk("vpc_id"); ok {
+	_, inVpc := d.GetOk("vpc_id")
+	_, useOpsworksDefaultSg := d.GetOk("use_opsworks_security_group")
+
+	if inVpc && useOpsworksDefaultSg {
 		log.Print("[INFO] Waiting for Opsworks built-in security groups to be deleted")
 		time.Sleep(30 * time.Second)
 	}

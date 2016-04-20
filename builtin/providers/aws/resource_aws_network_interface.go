@@ -33,7 +33,6 @@ func resourceAwsNetworkInterface() *schema.Resource {
 			"private_ips": &schema.Schema{
 				Type:     schema.TypeSet,
 				Optional: true,
-				ForceNew: true,
 				Computed: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 				Set:      schema.HashString,
@@ -51,6 +50,11 @@ func resourceAwsNetworkInterface() *schema.Resource {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
+			},
+
+			"description": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
 			},
 
 			"attachment": &schema.Schema{
@@ -99,6 +103,10 @@ func resourceAwsNetworkInterfaceCreate(d *schema.ResourceData, meta interface{})
 		request.PrivateIpAddresses = expandPrivateIPAddresses(private_ips)
 	}
 
+	if v, ok := d.GetOk("description"); ok {
+		request.Description = aws.String(v.(string))
+	}
+
 	log.Printf("[DEBUG] Creating network interface")
 	resp, err := conn.CreateNetworkInterface(request)
 	if err != nil {
@@ -136,6 +144,10 @@ func resourceAwsNetworkInterfaceRead(d *schema.ResourceData, meta interface{}) e
 	d.Set("private_ips", flattenNetworkInterfacesPrivateIPAddresses(eni.PrivateIpAddresses))
 	d.Set("security_groups", flattenGroupIdentifiers(eni.Groups))
 	d.Set("source_dest_check", eni.SourceDestCheck)
+
+	if eni.Description != nil {
+		d.Set("description", eni.Description)
+	}
 
 	// Tags
 	d.Set("tags", tagsToMap(eni.TagSet))
@@ -187,7 +199,7 @@ func resourceAwsNetworkInterfaceDetach(oa *schema.Set, meta interface{}, eniId s
 		log.Printf("[DEBUG] Waiting for ENI (%s) to become dettached", eniId)
 		stateConf := &resource.StateChangeConf{
 			Pending: []string{"true"},
-			Target:  "false",
+			Target:  []string{"false"},
 			Refresh: networkInterfaceAttachmentRefreshFunc(conn, eniId),
 			Timeout: 10 * time.Minute,
 		}
@@ -230,6 +242,47 @@ func resourceAwsNetworkInterfaceUpdate(d *schema.ResourceData, meta interface{})
 		d.SetPartial("attachment")
 	}
 
+	if d.HasChange("private_ips") {
+		o, n := d.GetChange("private_ips")
+		if o == nil {
+			o = new(schema.Set)
+		}
+		if n == nil {
+			n = new(schema.Set)
+		}
+
+		os := o.(*schema.Set)
+		ns := n.(*schema.Set)
+
+		// Unassign old IP addresses
+		unassignIps := os.Difference(ns)
+		if unassignIps.Len() != 0 {
+			input := &ec2.UnassignPrivateIpAddressesInput{
+				NetworkInterfaceId: aws.String(d.Id()),
+				PrivateIpAddresses: expandStringList(unassignIps.List()),
+			}
+			_, err := conn.UnassignPrivateIpAddresses(input)
+			if err != nil {
+				return fmt.Errorf("Failure to unassign Private IPs: %s", err)
+			}
+		}
+
+		// Assign new IP addresses
+		assignIps := ns.Difference(os)
+		if assignIps.Len() != 0 {
+			input := &ec2.AssignPrivateIpAddressesInput{
+				NetworkInterfaceId: aws.String(d.Id()),
+				PrivateIpAddresses: expandStringList(assignIps.List()),
+			}
+			_, err := conn.AssignPrivateIpAddresses(input)
+			if err != nil {
+				return fmt.Errorf("Failure to assign Private IPs: %s", err)
+			}
+		}
+
+		d.SetPartial("private_ips")
+	}
+
 	request := &ec2.ModifyNetworkInterfaceAttributeInput{
 		NetworkInterfaceId: aws.String(d.Id()),
 		SourceDestCheck:    &ec2.AttributeBooleanValue{Value: aws.Bool(d.Get("source_dest_check").(bool))},
@@ -254,6 +307,20 @@ func resourceAwsNetworkInterfaceUpdate(d *schema.ResourceData, meta interface{})
 		}
 
 		d.SetPartial("security_groups")
+	}
+
+	if d.HasChange("description") {
+		request := &ec2.ModifyNetworkInterfaceAttributeInput{
+			NetworkInterfaceId: aws.String(d.Id()),
+			Description:        &ec2.AttributeValue{Value: aws.String(d.Get("description").(string))},
+		}
+
+		_, err := conn.ModifyNetworkInterfaceAttribute(request)
+		if err != nil {
+			return fmt.Errorf("Failure updating ENI: %s", err)
+		}
+
+		d.SetPartial("description")
 	}
 
 	if err := setTags(conn, d); err != nil {

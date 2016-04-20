@@ -3,9 +3,13 @@ package aws
 import (
 	"fmt"
 	"log"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
@@ -29,6 +33,7 @@ func resourceAwsAutoscalingLifecycleHook() *schema.Resource {
 			"default_result": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
+				Computed: true,
 			},
 			"heartbeat_timeout": &schema.Schema{
 				Type:     schema.TypeInt,
@@ -44,25 +49,37 @@ func resourceAwsAutoscalingLifecycleHook() *schema.Resource {
 			},
 			"notification_target_arn": &schema.Schema{
 				Type:     schema.TypeString,
-				Required: true,
+				Optional: true,
 			},
 			"role_arn": &schema.Schema{
 				Type:     schema.TypeString,
-				Required: true,
+				Optional: true,
 			},
 		},
 	}
 }
 
 func resourceAwsAutoscalingLifecycleHookPut(d *schema.ResourceData, meta interface{}) error {
-	autoscalingconn := meta.(*AWSClient).autoscalingconn
-
+	conn := meta.(*AWSClient).autoscalingconn
 	params := getAwsAutoscalingPutLifecycleHookInput(d)
 
-	log.Printf("[DEBUG] AutoScaling PutLifecyleHook: %#v", params)
-	_, err := autoscalingconn.PutLifecycleHook(&params)
+	log.Printf("[DEBUG] AutoScaling PutLifecyleHook: %s", params)
+	err := resource.Retry(5*time.Minute, func() *resource.RetryError {
+		_, err := conn.PutLifecycleHook(&params)
+
+		if err != nil {
+			if awsErr, ok := err.(awserr.Error); ok {
+				if strings.Contains(awsErr.Message(), "Unable to publish test message to notification target") {
+					return resource.RetryableError(fmt.Errorf("[DEBUG] Retrying AWS AutoScaling Lifecycle Hook: %s", params))
+				}
+			}
+			return resource.NonRetryableError(fmt.Errorf("Error putting lifecycle hook: %s", err))
+		}
+		return nil
+	})
+
 	if err != nil {
-		return fmt.Errorf("Error putting lifecycle hook: %s", err)
+		return err
 	}
 
 	d.SetId(d.Get("name").(string))

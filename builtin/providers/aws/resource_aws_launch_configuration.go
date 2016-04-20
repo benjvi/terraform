@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -26,16 +27,33 @@ func resourceAwsLaunchConfiguration() *schema.Resource {
 
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
-				ForceNew: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				Computed:      true,
+				ForceNew:      true,
+				ConflictsWith: []string{"name_prefix"},
 				ValidateFunc: func(v interface{}, k string) (ws []string, errors []error) {
 					// https://github.com/boto/botocore/blob/9f322b1/botocore/data/autoscaling/2011-01-01/service-2.json#L1932-L1939
 					value := v.(string)
 					if len(value) > 255 {
 						errors = append(errors, fmt.Errorf(
 							"%q cannot be longer than 255 characters", k))
+					}
+					return
+				},
+			},
+
+			"name_prefix": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
+				ValidateFunc: func(v interface{}, k string) (ws []string, errors []error) {
+					// https://github.com/boto/botocore/blob/9f322b1/botocore/data/autoscaling/2011-01-01/service-2.json#L1932-L1939
+					// uuid is 26 characters, limit the prefix to 229.
+					value := v.(string)
+					if len(value) > 229 {
+						errors = append(errors, fmt.Errorf(
+							"%q cannot be longer than 229 characters, name is limited to 255", k))
 					}
 					return
 				},
@@ -164,6 +182,13 @@ func resourceAwsLaunchConfiguration() *schema.Resource {
 
 						"volume_type": &schema.Schema{
 							Type:     schema.TypeString,
+							Optional: true,
+							Computed: true,
+							ForceNew: true,
+						},
+
+						"encrypted": &schema.Schema{
+							Type:     schema.TypeBool,
 							Optional: true,
 							Computed: true,
 							ForceNew: true,
@@ -309,6 +334,7 @@ func resourceAwsLaunchConfigurationCreate(d *schema.ResourceData, meta interface
 			bd := v.(map[string]interface{})
 			ebs := &autoscaling.Ebs{
 				DeleteOnTermination: aws.Bool(bd["delete_on_termination"].(bool)),
+				Encrypted:           aws.Bool(bd["encrypted"].(bool)),
 			}
 
 			if v, ok := bd["snapshot_id"].(string); ok && v != "" {
@@ -369,6 +395,11 @@ func resourceAwsLaunchConfigurationCreate(d *schema.ResourceData, meta interface
 			}
 
 			if dn, err := fetchRootDeviceName(d.Get("image_id").(string), ec2conn); err == nil {
+				if dn == nil {
+					return fmt.Errorf(
+						"Expected to find a Root Device name for AMI (%s), but got none",
+						d.Get("image_id").(string))
+				}
 				blockDevices = append(blockDevices, &autoscaling.BlockDeviceMapping{
 					DeviceName: dn,
 					Ebs:        ebs,
@@ -386,6 +417,8 @@ func resourceAwsLaunchConfigurationCreate(d *schema.ResourceData, meta interface
 	var lcName string
 	if v, ok := d.GetOk("name"); ok {
 		lcName = v.(string)
+	} else if v, ok := d.GetOk("name_prefix"); ok {
+		lcName = resource.PrefixedUniqueId(v.(string))
 	} else {
 		lcName = resource.UniqueId()
 	}
@@ -396,17 +429,15 @@ func resourceAwsLaunchConfigurationCreate(d *schema.ResourceData, meta interface
 
 	// IAM profiles can take ~10 seconds to propagate in AWS:
 	// http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#launch-instance-with-role-console
-	err := resource.Retry(30*time.Second, func() error {
+	err := resource.Retry(30*time.Second, func() *resource.RetryError {
 		_, err := autoscalingconn.CreateLaunchConfiguration(&createLaunchConfigurationOpts)
 		if err != nil {
 			if awsErr, ok := err.(awserr.Error); ok {
-				if awsErr.Message() == "Invalid IamInstanceProfile" {
-					return err
+				if strings.Contains(awsErr.Message(), "Invalid IamInstanceProfile") {
+					return resource.RetryableError(err)
 				}
 			}
-			return &resource.RetryError{
-				Err: err,
-			}
+			return resource.NonRetryableError(err)
 		}
 		return nil
 	})
@@ -420,8 +451,12 @@ func resourceAwsLaunchConfigurationCreate(d *schema.ResourceData, meta interface
 
 	// We put a Retry here since sometimes eventual consistency bites
 	// us and we need to retry a few times to get the LC to load properly
-	return resource.Retry(30*time.Second, func() error {
-		return resourceAwsLaunchConfigurationRead(d, meta)
+	return resource.Retry(30*time.Second, func() *resource.RetryError {
+		err := resourceAwsLaunchConfigurationRead(d, meta)
+		if err != nil {
+			return resource.RetryableError(err)
+		}
+		return nil
 	})
 }
 
@@ -545,6 +580,9 @@ func readBlockDevicesFromLaunchConfiguration(d *schema.ResourceData, lc *autosca
 		}
 		if bdm.Ebs != nil && bdm.Ebs.Iops != nil {
 			bd["iops"] = *bdm.Ebs.Iops
+		}
+		if bdm.Ebs != nil && bdm.Ebs.Encrypted != nil {
+			bd["encrypted"] = *bdm.Ebs.Encrypted
 		}
 		if bdm.DeviceName != nil && *bdm.DeviceName == *rootDeviceName {
 			blockDevices["root"] = bd

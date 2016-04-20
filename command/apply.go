@@ -111,11 +111,27 @@ func (c *ApplyCommand) Run(args []string) int {
 		return 1
 	}
 	if !destroyForce && c.Destroy {
+		// Default destroy message
+		desc := "Terraform will delete all your managed infrastructure.\n" +
+			"There is no undo. Only 'yes' will be accepted to confirm."
+
+		// If targets are specified, list those to user
+		if c.Meta.targets != nil {
+			var descBuffer bytes.Buffer
+			descBuffer.WriteString("Terraform will delete the following infrastructure:\n")
+			for _, target := range c.Meta.targets {
+				descBuffer.WriteString("\t")
+				descBuffer.WriteString(target)
+				descBuffer.WriteString("\n")
+			}
+			descBuffer.WriteString("There is no undo. Only 'yes' will be accepted to confirm")
+			desc = descBuffer.String()
+		}
+
 		v, err := c.UIInput().Input(&terraform.InputOpts{
-			Id:    "destroy",
-			Query: "Do you really want to destroy?",
-			Description: "Terraform will delete all your managed infrastructure.\n" +
-				"There is no undo. Only 'yes' will be accepted to confirm.",
+			Id:          "destroy",
+			Query:       "Do you really want to destroy?",
+			Description: desc,
 		})
 		if err != nil {
 			c.Ui.Error(fmt.Sprintf("Error asking for confirmation: %s", err))
@@ -260,10 +276,15 @@ func (c *ApplyCommand) Synopsis() string {
 
 func (c *ApplyCommand) helpApply() string {
 	helpText := `
-Usage: terraform apply [options] [DIR]
+Usage: terraform apply [options] [DIR-OR-PLAN]
 
   Builds or changes infrastructure according to Terraform configuration
   files in DIR.
+
+  By default, apply scans the current directory for the configuration
+  and applies the changes appropriately. However, a path to another
+  configuration or an execution plan can be provided. Execution plans can be
+  used to only execute a pre-determined set of actions.
 
   DIR can also be a SOURCE as given to the "init" command. In this case,
   apply behaves as though "init" was called followed by "apply". This only

@@ -223,7 +223,7 @@ resource "cloudstack_instance" "foobar" {
   name = "terraform-test"
   display_name = "terraform"
   service_offering= "%s"
-  network = "%s"
+  network_id = "%s"
   template = "%s"
   zone = "%s"
   expunge = true
@@ -248,7 +248,7 @@ resource "cloudstack_instance" "foobar" {
   name = "terraform-test"
   display_name = "terraform"
   service_offering= "%s"
-  network = "%s"
+  network_id = "%s"
   template = "%s"
   zone = "%s"
   expunge = true
@@ -272,7 +272,7 @@ resource "cloudstack_instance" "foobar" {
   name = "terraform-test"
   display_name = "terraform"
   service_offering= "%s"
-  network = "%s"
+  network_id = "%s"
   template = "%s"
   zone = "%s"
   expunge = true

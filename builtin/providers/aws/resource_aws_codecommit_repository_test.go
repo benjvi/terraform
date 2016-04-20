@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/codecommit"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
@@ -52,6 +53,50 @@ func TestAccAWSCodeCommitRepository_withChanges(t *testing.T) {
 	})
 }
 
+func TestAccAWSCodeCommitRepository_create_default_branch(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCodeCommitRepositoryDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccCodeCommitRepository_with_default_branch,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCodeCommitRepositoryExists("aws_codecommit_repository.test"),
+					resource.TestCheckResourceAttr(
+						"aws_codecommit_repository.test", "default_branch", "master"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccAWSCodeCommitRepository_create_and_update_default_branch(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCodeCommitRepositoryDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccCodeCommitRepository_basic,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCodeCommitRepositoryExists("aws_codecommit_repository.test"),
+					resource.TestCheckResourceAttr(
+						"aws_codecommit_repository.test", "default_branch", ""),
+				),
+			},
+			resource.TestStep{
+				Config: testAccCodeCommitRepository_with_default_branch,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCodeCommitRepositoryExists("aws_codecommit_repository.test"),
+					resource.TestCheckResourceAttr(
+						"aws_codecommit_repository.test", "default_branch", "master"),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckCodeCommitRepositoryExists(name string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[name]
@@ -86,15 +131,33 @@ func testAccCheckCodeCommitRepositoryExists(name string) resource.TestCheckFunc 
 }
 
 func testAccCheckCodeCommitRepositoryDestroy(s *terraform.State) error {
-	if len(s.RootModule().Resources) > 0 {
-		return fmt.Errorf("Expected all resources to be gone, but found: %#v",
-			s.RootModule().Resources)
+	conn := testAccProvider.Meta().(*AWSClient).codecommitconn
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "aws_codecommit_repository" {
+			continue
+		}
+
+		_, err := conn.GetRepository(&codecommit.GetRepositoryInput{
+			RepositoryName: aws.String(rs.Primary.ID),
+		})
+
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == "RepositoryDoesNotExistException" {
+			continue
+		}
+		if err == nil {
+			return fmt.Errorf("Repository still exists: %s", rs.Primary.ID)
+		}
+		return err
 	}
 
 	return nil
 }
 
 const testAccCodeCommitRepository_basic = `
+provider "aws" {
+  region = "us-east-1"
+}
 resource "aws_codecommit_repository" "test" {
   repository_name = "my_test_repository"
   description = "This is a test description"
@@ -102,8 +165,22 @@ resource "aws_codecommit_repository" "test" {
 `
 
 const testAccCodeCommitRepository_withChanges = `
+provider "aws" {
+  region = "us-east-1"
+}
 resource "aws_codecommit_repository" "test" {
   repository_name = "my_test_repository"
   description = "This is a test description - with changes"
+}
+`
+
+const testAccCodeCommitRepository_with_default_branch = `
+provider "aws" {
+  region = "us-east-1"
+}
+resource "aws_codecommit_repository" "test" {
+  repository_name = "my_test_repository"
+  description = "This is a test description"
+  default_branch = "master"
 }
 `

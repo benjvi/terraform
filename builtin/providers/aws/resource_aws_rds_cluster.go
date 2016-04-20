@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -70,6 +71,13 @@ func resourceAwsRDSCluster() *schema.Resource {
 				Computed: true,
 			},
 
+			"storage_encrypted": &schema.Schema{
+				Type:     schema.TypeBool,
+				Optional: true,
+				Default:  false,
+				ForceNew: true,
+			},
+
 			"final_snapshot_identifier": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -122,6 +130,38 @@ func resourceAwsRDSCluster() *schema.Resource {
 				Elem:     &schema.Schema{Type: schema.TypeString},
 				Set:      schema.HashString,
 			},
+
+			"preferred_backup_window": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+
+			"preferred_maintenance_window": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+				StateFunc: func(val interface{}) string {
+					if val == nil {
+						return ""
+					}
+					return strings.ToLower(val.(string))
+				},
+			},
+
+			"backup_retention_period": &schema.Schema{
+				Type:     schema.TypeInt,
+				Optional: true,
+				Default:  1,
+				ValidateFunc: func(v interface{}, k string) (ws []string, es []error) {
+					value := v.(int)
+					if value > 35 {
+						es = append(es, fmt.Errorf(
+							"backup retention period cannot be more than 35 days"))
+					}
+					return
+				},
+			},
 		},
 	}
 }
@@ -134,6 +174,7 @@ func resourceAwsRDSClusterCreate(d *schema.ResourceData, meta interface{}) error
 		Engine:              aws.String("aurora"),
 		MasterUserPassword:  aws.String(d.Get("master_password").(string)),
 		MasterUsername:      aws.String(d.Get("master_username").(string)),
+		StorageEncrypted:    aws.Bool(d.Get("storage_encrypted").(bool)),
 	}
 
 	if v := d.Get("database_name"); v.(string) != "" {
@@ -156,6 +197,18 @@ func resourceAwsRDSClusterCreate(d *schema.ResourceData, meta interface{}) error
 		createOpts.AvailabilityZones = expandStringList(attr.List())
 	}
 
+	if v, ok := d.GetOk("backup_retention_period"); ok {
+		createOpts.BackupRetentionPeriod = aws.Int64(int64(v.(int)))
+	}
+
+	if v, ok := d.GetOk("preferred_backup_window"); ok {
+		createOpts.PreferredBackupWindow = aws.String(v.(string))
+	}
+
+	if v, ok := d.GetOk("preferred_maintenance_window"); ok {
+		createOpts.PreferredMaintenanceWindow = aws.String(v.(string))
+	}
+
 	log.Printf("[DEBUG] RDS Cluster create options: %s", createOpts)
 	resp, err := conn.CreateDBCluster(createOpts)
 	if err != nil {
@@ -167,7 +220,7 @@ func resourceAwsRDSClusterCreate(d *schema.ResourceData, meta interface{}) error
 	d.SetId(*resp.DBCluster.DBClusterIdentifier)
 	stateConf := &resource.StateChangeConf{
 		Pending:    []string{"creating", "backing-up", "modifying"},
-		Target:     "available",
+		Target:     []string{"available"},
 		Refresh:    resourceAwsRDSClusterStateRefreshFunc(d, meta),
 		Timeout:    5 * time.Minute,
 		MinTimeout: 3 * time.Second,
@@ -217,12 +270,24 @@ func resourceAwsRDSClusterRead(d *schema.ResourceData, meta interface{}) error {
 	if err := d.Set("availability_zones", aws.StringValueSlice(dbc.AvailabilityZones)); err != nil {
 		return fmt.Errorf("[DEBUG] Error saving AvailabilityZones to state for RDS Cluster (%s): %s", d.Id(), err)
 	}
-	d.Set("database_name", dbc.DatabaseName)
+
+	// Only set the DatabaseName if it is not nil. There is a known API bug where
+	// RDS accepts a DatabaseName but does not return it, causing a perpetual
+	// diff.
+	//	See https://github.com/hashicorp/terraform/issues/4671 for backstory
+	if dbc.DatabaseName != nil {
+		d.Set("database_name", dbc.DatabaseName)
+	}
+
 	d.Set("db_subnet_group_name", dbc.DBSubnetGroup)
 	d.Set("endpoint", dbc.Endpoint)
 	d.Set("engine", dbc.Engine)
 	d.Set("master_username", dbc.MasterUsername)
 	d.Set("port", dbc.Port)
+	d.Set("storage_encrypted", dbc.StorageEncrypted)
+	d.Set("backup_retention_period", dbc.BackupRetentionPeriod)
+	d.Set("preferred_backup_window", dbc.PreferredBackupWindow)
+	d.Set("preferred_maintenance_window", dbc.PreferredMaintenanceWindow)
 
 	var vpcg []string
 	for _, g := range dbc.VpcSecurityGroups {
@@ -263,6 +328,18 @@ func resourceAwsRDSClusterUpdate(d *schema.ResourceData, meta interface{}) error
 		}
 	}
 
+	if d.HasChange("preferred_backup_window") {
+		req.PreferredBackupWindow = aws.String(d.Get("preferred_backup_window").(string))
+	}
+
+	if d.HasChange("preferred_maintenance_window") {
+		req.PreferredMaintenanceWindow = aws.String(d.Get("preferred_maintenance_window").(string))
+	}
+
+	if d.HasChange("backup_retention_period") {
+		req.BackupRetentionPeriod = aws.Int64(int64(d.Get("backup_retention_period").(int)))
+	}
+
 	_, err := conn.ModifyDBCluster(req)
 	if err != nil {
 		return fmt.Errorf("[WARN] Error modifying RDS Cluster (%s): %s", d.Id(), err)
@@ -292,7 +369,7 @@ func resourceAwsRDSClusterDelete(d *schema.ResourceData, meta interface{}) error
 
 	stateConf := &resource.StateChangeConf{
 		Pending:    []string{"deleting", "backing-up", "modifying"},
-		Target:     "destroyed",
+		Target:     []string{"destroyed"},
 		Refresh:    resourceAwsRDSClusterStateRefreshFunc(d, meta),
 		Timeout:    5 * time.Minute,
 		MinTimeout: 3 * time.Second,

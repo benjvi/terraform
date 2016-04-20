@@ -21,15 +21,9 @@ func TestAccCloudStackPortForward_basic(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudStackPortForwardsExist("cloudstack_port_forward.foo"),
 					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "ipaddress", CLOUDSTACK_PUBLIC_IPADDRESS),
+						"cloudstack_port_forward.foo", "ip_address_id", CLOUDSTACK_PUBLIC_IPADDRESS),
 					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.protocol", "tcp"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.private_port", "443"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.public_port", "8443"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.virtual_machine", "terraform-test"),
+						"cloudstack_port_forward.foo", "forward.#", "1"),
 				),
 			},
 		},
@@ -47,17 +41,9 @@ func TestAccCloudStackPortForward_update(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudStackPortForwardsExist("cloudstack_port_forward.foo"),
 					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "ipaddress", CLOUDSTACK_PUBLIC_IPADDRESS),
+						"cloudstack_port_forward.foo", "ip_address_id", CLOUDSTACK_PUBLIC_IPADDRESS),
 					resource.TestCheckResourceAttr(
 						"cloudstack_port_forward.foo", "forward.#", "1"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.protocol", "tcp"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.private_port", "443"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.public_port", "8443"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.virtual_machine", "terraform-test"),
 				),
 			},
 
@@ -66,25 +52,9 @@ func TestAccCloudStackPortForward_update(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudStackPortForwardsExist("cloudstack_port_forward.foo"),
 					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "ipaddress", CLOUDSTACK_PUBLIC_IPADDRESS),
+						"cloudstack_port_forward.foo", "ip_address_id", CLOUDSTACK_PUBLIC_IPADDRESS),
 					resource.TestCheckResourceAttr(
 						"cloudstack_port_forward.foo", "forward.#", "2"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.8416686.protocol", "tcp"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.8416686.private_port", "80"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.8416686.public_port", "8080"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.8416686.virtual_machine", "terraform-test"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.protocol", "tcp"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.private_port", "443"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.public_port", "8443"),
-					resource.TestCheckResourceAttr(
-						"cloudstack_port_forward.foo", "forward.1537694805.virtual_machine", "terraform-test"),
 				),
 			},
 		},
@@ -161,13 +131,13 @@ resource "cloudstack_instance" "foobar" {
 }
 
 resource "cloudstack_port_forward" "foo" {
-  ipaddress = "%s"
+  ip_address_id = "%s"
 
   forward {
     protocol = "tcp"
     private_port = 443
     public_port = 8443
-    virtual_machine = "${cloudstack_instance.foobar.name}"
+    virtual_machine_id = "${cloudstack_instance.foobar.id}"
   }
 }`,
 	CLOUDSTACK_SERVICE_OFFERING_1,
@@ -187,20 +157,20 @@ resource "cloudstack_instance" "foobar" {
 }
 
 resource "cloudstack_port_forward" "foo" {
-  ipaddress = "%s"
+  ip_address_id = "%s"
 
   forward {
     protocol = "tcp"
     private_port = 443
     public_port = 8443
-    virtual_machine = "${cloudstack_instance.foobar.name}"
+    virtual_machine_id = "${cloudstack_instance.foobar.id}"
   }
 
   forward {
     protocol = "tcp"
     private_port = 80
     public_port = 8080
-    virtual_machine = "${cloudstack_instance.foobar.name}"
+    virtual_machine_id = "${cloudstack_instance.foobar.id}"
   }
 }`,
 	CLOUDSTACK_SERVICE_OFFERING_1,

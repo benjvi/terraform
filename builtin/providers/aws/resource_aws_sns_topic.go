@@ -44,16 +44,21 @@ func resourceAwsSnsTopic() *schema.Resource {
 			"policy": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
-				ForceNew: false,
 				Computed: true,
 				StateFunc: func(v interface{}) string {
-					jsonb := []byte(v.(string))
+					s, ok := v.(string)
+					if !ok || s == "" {
+						return ""
+					}
+					jsonb := []byte(s)
 					buffer := new(bytes.Buffer)
 					if err := json.Compact(buffer, jsonb); err != nil {
 						log.Printf("[WARN] Error compacting JSON for Policy in SNS Topic")
 						return ""
 					}
-					return buffer.String()
+					value := normalizeJson(buffer.String())
+					log.Printf("[DEBUG] topic policy before save: %s", value)
+					return value
 				},
 			},
 			"delivery_policy": &schema.Schema{
@@ -116,7 +121,7 @@ func resourceAwsSnsTopicUpdate(d *schema.ResourceData, meta interface{}) error {
 					log.Printf("[DEBUG] Updating SNS Topic (%s) attributes request: %s", d.Id(), req)
 					stateConf := &resource.StateChangeConf{
 						Pending:    []string{"retrying"},
-						Target:     "success",
+						Target:     []string{"success"},
 						Refresh:    resourceAwsSNSUpdateRefreshFunc(meta, req),
 						Timeout:    1 * time.Minute,
 						MinTimeout: 3 * time.Second,
@@ -160,6 +165,12 @@ func resourceAwsSnsTopicRead(d *schema.ResourceData, meta interface{}) error {
 	})
 
 	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == "NotFound" {
+			log.Printf("[WARN] SNS Topic (%s) not found, error code (404)", d.Id())
+			d.SetId("")
+			return nil
+		}
+
 		return err
 	}
 
@@ -168,15 +179,20 @@ func resourceAwsSnsTopicRead(d *schema.ResourceData, meta interface{}) error {
 		resource := *resourceAwsSnsTopic()
 		// iKey = internal struct key, oKey = AWS Attribute Map key
 		for iKey, oKey := range SNSAttributeMap {
-			log.Printf("[DEBUG] Updating %s => %s", iKey, oKey)
+			log.Printf("[DEBUG] Reading %s => %s", iKey, oKey)
 
 			if attrmap[oKey] != nil {
 				// Some of the fetched attributes are stateful properties such as
 				// the number of subscriptions, the owner, etc. skip those
 				if resource.Schema[iKey] != nil {
-					value := *attrmap[oKey]
-					log.Printf("[DEBUG] Updating %s => %s -> %s", iKey, oKey, value)
-					d.Set(iKey, *attrmap[oKey])
+					var value string
+					if iKey == "policy" {
+						value = normalizeJson(*attrmap[oKey])
+					} else {
+						value = *attrmap[oKey]
+					}
+					log.Printf("[DEBUG] Reading %s => %s -> %s", iKey, oKey, value)
+					d.Set(iKey, value)
 				}
 			}
 		}

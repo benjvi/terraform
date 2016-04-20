@@ -25,8 +25,8 @@ A resource configuration looks like the following:
 
 ```
 resource "aws_instance" "web" {
-    ami = "ami-123456"
-    instance_type = "m1.small"
+    ami = "ami-408c7f28"
+    instance_type = "t1.micro"
 }
 ```
 
@@ -67,6 +67,8 @@ The `lifecycle` block allows the following keys to be set:
   * `prevent_destroy` (bool) - This flag provides extra protection against the
       destruction of a given resource. When this is set to `true`, any plan
       that includes a destroy of this resource will return an error message.
+
+<a id="ignore-changes"></a>
 
   * `ignore_changes` (list of strings) - Customizes how diffs are evaluated for
       resources, allowing individual attributes to be ignored through changes.

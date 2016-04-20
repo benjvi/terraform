@@ -93,6 +93,7 @@ func resourceAwsCloudFormationStack() *schema.Resource {
 }
 
 func resourceAwsCloudFormationStackCreate(d *schema.ResourceData, meta interface{}) error {
+	retryTimeout := int64(30)
 	conn := meta.(*AWSClient).cfconn
 
 	input := cloudformation.CreateStackInput{
@@ -129,7 +130,12 @@ func resourceAwsCloudFormationStackCreate(d *schema.ResourceData, meta interface
 		input.Tags = expandCloudFormationTags(v.(map[string]interface{}))
 	}
 	if v, ok := d.GetOk("timeout_in_minutes"); ok {
-		input.TimeoutInMinutes = aws.Int64(int64(v.(int)))
+		m := int64(v.(int))
+		input.TimeoutInMinutes = aws.Int64(m)
+		if m > retryTimeout {
+			retryTimeout = m + 5
+			log.Printf("[DEBUG] CloudFormation timeout: %d", retryTimeout)
+		}
 	}
 
 	log.Printf("[DEBUG] Creating CloudFormation Stack: %s", input)
@@ -142,8 +148,8 @@ func resourceAwsCloudFormationStackCreate(d *schema.ResourceData, meta interface
 
 	wait := resource.StateChangeConf{
 		Pending:    []string{"CREATE_IN_PROGRESS", "ROLLBACK_IN_PROGRESS", "ROLLBACK_COMPLETE"},
-		Target:     "CREATE_COMPLETE",
-		Timeout:    30 * time.Minute,
+		Target:     []string{"CREATE_COMPLETE"},
+		Timeout:    time.Duration(retryTimeout) * time.Minute,
 		MinTimeout: 5 * time.Second,
 		Refresh: func() (interface{}, string, error) {
 			resp, err := conn.DescribeStacks(&cloudformation.DescribeStacksInput{
@@ -190,7 +196,17 @@ func resourceAwsCloudFormationStackRead(d *schema.ResourceData, meta interface{}
 
 	stacks := resp.Stacks
 	if len(stacks) < 1 {
+		log.Printf("[DEBUG] Removing CloudFormation stack %s as it's already gone", d.Id())
+		d.SetId("")
 		return nil
+	}
+	for _, s := range stacks {
+		if *s.StackId == d.Id() && *s.StackStatus == "DELETE_COMPLETE" {
+			log.Printf("[DEBUG] Removing CloudFormation stack %s"+
+				" as it has been already deleted", d.Id())
+			d.SetId("")
+			return nil
+		}
 	}
 
 	tInput := cloudformation.GetTemplateInput{
@@ -258,21 +274,28 @@ func resourceAwsCloudFormationStackUpdate(d *schema.ResourceData, meta interface
 		StackName: aws.String(d.Get("name").(string)),
 	}
 
-	if d.HasChange("template_body") {
-		input.TemplateBody = aws.String(normalizeJson(d.Get("template_body").(string)))
+	// Either TemplateBody, TemplateURL or UsePreviousTemplate are required
+	if v, ok := d.GetOk("template_url"); ok {
+		input.TemplateURL = aws.String(v.(string))
 	}
-	if d.HasChange("template_url") {
-		input.TemplateURL = aws.String(d.Get("template_url").(string))
+	if v, ok := d.GetOk("template_body"); ok && input.TemplateURL == nil {
+		input.TemplateBody = aws.String(normalizeJson(v.(string)))
 	}
-	if d.HasChange("capabilities") {
-		input.Capabilities = expandStringList(d.Get("capabilities").(*schema.Set).List())
+
+	// Capabilities must be present whether they are changed or not
+	if v, ok := d.GetOk("capabilities"); ok {
+		input.Capabilities = expandStringList(v.(*schema.Set).List())
 	}
+
 	if d.HasChange("notification_arns") {
 		input.NotificationARNs = expandStringList(d.Get("notification_arns").(*schema.Set).List())
 	}
-	if d.HasChange("parameters") {
-		input.Parameters = expandCloudFormationParameters(d.Get("parameters").(map[string]interface{}))
+
+	// Parameters must be present whether they are changed or not
+	if v, ok := d.GetOk("parameters"); ok {
+		input.Parameters = expandCloudFormationParameters(v.(map[string]interface{}))
 	}
+
 	if d.HasChange("policy_body") {
 		input.StackPolicyBody = aws.String(normalizeJson(d.Get("policy_body").(string)))
 	}
@@ -299,7 +322,7 @@ func resourceAwsCloudFormationStackUpdate(d *schema.ResourceData, meta interface
 			"UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS",
 			"UPDATE_ROLLBACK_COMPLETE",
 		},
-		Target:     "UPDATE_COMPLETE",
+		Target:     []string{"UPDATE_COMPLETE"},
 		Timeout:    15 * time.Minute,
 		MinTimeout: 5 * time.Second,
 		Refresh: func() (interface{}, string, error) {
@@ -358,7 +381,7 @@ func resourceAwsCloudFormationStackDelete(d *schema.ResourceData, meta interface
 
 	wait := resource.StateChangeConf{
 		Pending:    []string{"DELETE_IN_PROGRESS", "ROLLBACK_IN_PROGRESS"},
-		Target:     "DELETE_COMPLETE",
+		Target:     []string{"DELETE_COMPLETE"},
 		Timeout:    30 * time.Minute,
 		MinTimeout: 5 * time.Second,
 		Refresh: func() (interface{}, string, error) {

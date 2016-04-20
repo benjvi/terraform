@@ -13,7 +13,7 @@ Provides a DynamoDB table resource
 ## Example Usage
 
 The following dynamodb table description models the table and GSI shown
-in the [AWS SDK example documentation](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html)
+in the [AWS SDK example documentation](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html)
 
 ```
 resource "aws_dynamodb_table" "basic-dynamodb-table" {
@@ -61,19 +61,22 @@ The following arguments are supported:
 * `attribute` - Define an attribute, has two properties:
   * `name` - The name of the attribute
   * `type` - One of: S, N, or B for (S)tring, (N)umber or (B)inary data
+* `stream_enabled` - (Optional) Indicates whether Streams are to be enabled (true) or disabled (false).
+* `stream_view_type` - (Optional) When an item in the table is modified, StreamViewType determines what information is written to the table's stream. Valid values are KEYS_ONLY, NEW_IMAGE, OLD_IMAGE, NEW_AND_OLD_IMAGES.
 * `local_secondary_index` - (Optional) Describe an LSI on the table;
   these can only be allocated *at creation* so you cannot change this
 definition after you have created the resource.
 * `global_secondary_index` - (Optional) Describe a GSO for the table;
   subject to the normal limits on the number of GSIs, projected
-attributes, etc.  
+attributes, etc.
 
 For both `local_secondary_index` and `global_secondary_index` objects,
 the following properties are supported:
 
 * `name` - (Required) The name of the LSI or GSI
-* `hash_key` - (Required) The name of the hash key in the index; must be
-  defined as an attribute in the resource
+* `hash_key` - (Required for GSI) The name of the hash key in the index; must be
+defined as an attribute in the resource. Only applies to
+  `global_secondary_index`
 * `range_key` - (Required) The name of the range key; must be defined
 * `projection_type` - (Required) One of "ALL", "INCLUDE" or "KEYS_ONLY"
    where *ALL* projects every attribute into the index, *KEYS_ONLY*
@@ -102,7 +105,7 @@ because these get re-used in numerous places (i.e the table's range key
 could be a part of one or more GSIs), they are stored on the table
 object to prevent duplication and increase consistency. If you add
 attributes here that are not used in these scenarios it can cause an
-infinite loop in planning.  
+infinite loop in planning.
 
 
 ## Attributes Reference
@@ -111,4 +114,5 @@ The following attributes are exported:
 
 * `arn` - The arn of the table
 * `id` - The name of the table
+* `stream_arn` - The ARN of the Table Stream. Only available when `stream_enabled = true`
 
