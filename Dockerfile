@@ -1,4 +1,4 @@
-FROM golang:1.4
+FROM golang:1.6
 
 MAINTAINER Benjamin Vickers <bv@benjvi.com>
 
