@@ -62,33 +62,6 @@ func TestRead_TildePath(t *testing.T) {
 	}
 }
 
-func TestRead_PathNoPermission(t *testing.T) {
-	isPath := true
-	f, cleanup := testTempFile(t)
-	defer cleanup()
-
-	if _, err := io.WriteString(f, "foobar"); err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	f.Close()
-
-	if err := os.Chmod(f.Name(), 0); err != nil {
-		t.Fatalf("err: %s", err)
-	}
-
-	contents, wasPath, err := Read(f.Name())
-
-	if err == nil {
-		t.Fatal("Expected error, got none!")
-	}
-	if wasPath != isPath {
-		t.Fatalf("expected wasPath: %t, got %t", isPath, wasPath)
-	}
-	if contents != "" {
-		t.Fatalf("expected contents %s, got %s", "", contents)
-	}
-}
-
 func TestRead_Contents(t *testing.T) {
 	isPath := false
 	input := "hello"

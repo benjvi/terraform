@@ -1,0 +1,6 @@
+[submodule "vendor/github.com/benjvi/go-cloudstack"]
+	path = vendor/github.com/benjvi/go-cloudstack
+	url = https://github.com/benjvi/go-cloudstack.git
+[submodule "vendor/github.com/benjvi/go-net-api"]
+	path = vendor/github.com/benjvi/go-net-api
+	url = https://github.com/benjvi/go-net-api.git
